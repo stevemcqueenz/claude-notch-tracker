@@ -27,7 +27,7 @@ struct IslandView: View {
     private let wing: CGFloat = 56
     private let iconSize: CGFloat = 18
     private let edgeInset: CGFloat = 12   // keeps content off the pill's flared edges
-    private let dropHeight: CGFloat = 172
+    private let dropHeight: CGFloat = 196
 
     private var expanded: Bool { model.isExpanded }
     private var closedH: CGFloat { max(topInset, 30) }
