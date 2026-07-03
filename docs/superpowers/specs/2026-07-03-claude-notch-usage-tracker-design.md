@@ -7,9 +7,10 @@
 ## 1. Summary
 
 A native macOS menu-bar agent that renders a "Dynamic Island"-style HUD anchored
-under the MacBook notch. The **left** side shows the Claude mark ("the Claude
-guy"); the **right** side shows the headline usage metric — **time left in the
-current 5-hour rate-limit block** — with a color-shifting fill ring. Clicking the
+under the MacBook notch. The **left** side shows **Clawd** (the Claude mascot) —
+and the avatar is **user-selectable**; the **right** side shows the headline usage
+metric — **time left in the current 5-hour rate-limit block** — with a
+color-shifting fill ring. Clicking the
 usage side expands a panel with tokens, cost, active session, and model split.
 Clicking the Claude guy opens a quick menu (pause, history, settings, quit).
 
@@ -90,6 +91,8 @@ behavior without an Info.plist, so a bare SwiftPM executable works for dev).
 | `AppMonitor` | Is Claude.app running? (NSWorkspace); notch geometry via `NSScreen.safeAreaInsets` | AppKit |
 | `IslandWindow` | Borderless non-activating `NSPanel` pinned under notch (or top-center pill) | AppKit |
 | `IslandView` | SwiftUI collapsed + expanded UI, animations, hover, click routing | SwiftUI |
+| `AvatarView` | Renders selected `AvatarStyle` (Clawd / spark / custom) + idle/active states | SwiftUI |
+| `Settings` | Avatar picker + prefs, persisted to UserDefaults | Foundation |
 | `StatusItemController` | Menu-bar `NSStatusItem`; quit/pause/settings; owns lifecycle | AppKit |
 | `AppModel` | `@Observable` root state; wires watcher → store → views | all above |
 
@@ -116,16 +119,28 @@ NSWorkspace (AppMonitor): Claude.app launched/terminated
 ## 6. UI behavior
 
 **Collapsed island** (notch, ~38pt tall, black, bottom-rounded straddling notch):
-- Left: Claude mark in a rounded clay tile (subtle pulse while a session is live).
+- Left: **Clawd** in a rounded tile — the selected avatar (subtle pulse / small
+  reaction while a session is live; e.g. a wiggle on new activity, calm when idle).
 - Right: `2h 14m` (tabular) + fill ring (teal/amber/red).
 - Hover: pill widens slightly to preview headline; no click needed.
+
+**Avatar (choosable).** The left character is driven by an `AvatarStyle` chosen in
+Settings and persisted (UserDefaults). v1 options:
+- **Clawd** (default) — bundled mascot art, with idle/active animation states.
+- **Spark mark** — the minimal Claude sunburst, for a quieter look.
+- **Custom image** — user picks a PNG/SVG; scaled to the tile.
+
+`AvatarStyle` is an enum + a small registry so more characters can be added later
+without touching layout. Clawd art is bundled as an asset (user can supply the
+exact asset; placeholder rendering used until then).
 
 **Expanded panel** (click the usage side): dark rounded card above the notch with
 the block ring + "Xh Ym left / in current 5-hour block", a 2×2 metric grid
 (tokens today, est. cost today, active session, top model), and History / Settings
 buttons. Dismiss on outside-click or Esc.
 
-**Claude-guy click:** popover menu — Pause tracking, Open history, Settings, Quit.
+**Clawd click:** popover menu — Pause tracking, Open history, Settings
+(incl. avatar picker), Quit.
 
 **No-notch fallback:** if `safeAreaInsets.top == 0` (no notch / external display),
 render the island as a floating rounded pill centered at the top of the active
@@ -163,6 +178,7 @@ Sources/ClaudeNotch/
          PricingTable.swift  LogWatcher.swift
   System/ AppMonitor.swift  IslandWindow.swift  StatusItemController.swift
   UI/    IslandView.swift  CollapsedView.swift  ExpandedView.swift  Ring.swift
+         AvatarView.swift  AvatarStyle.swift  SettingsView.swift
 Tests/ClaudeNotchTests/            # Swift Testing + fixtures
 docs/superpowers/specs/…           # this spec
 ```
@@ -175,7 +191,8 @@ Run: `swift run ClaudeNotch`. Build: `swift build`. Test: `swift test`.
 2. `BlockCalculator` + `UsageStore` + `PricingTable` + tests (blocks, today, cost).
 3. `LogWatcher` (FSEvents) + `AppModel` wiring — headless: prints live snapshot.
 4. `IslandWindow` + notch detection + collapsed `IslandView` (ring + time).
-5. Expanded panel + click routing + hover; `StatusItemController` + menu.
+5. Expanded panel + click routing + hover; `AvatarView` + `AvatarStyle` (Clawd /
+   spark / custom) + Settings avatar picker; `StatusItemController` + menu.
 6. `AppMonitor` show/hide tied to Claude.app; no-notch fallback; polish/animation.
 
 Each milestone builds and runs on its own; 1–3 are verifiable via `swift test`
