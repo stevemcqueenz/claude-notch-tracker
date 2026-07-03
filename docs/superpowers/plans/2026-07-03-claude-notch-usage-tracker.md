@@ -1085,7 +1085,7 @@ enum Fmt {
 }
 
 struct CollapsedView: View {
-    var model: AppModel
+    let model: AppModel   // passed-in @Observable — plain property, NOT @State
 
     var body: some View {
         HStack {
@@ -1117,7 +1117,7 @@ extension Notification.Name { static let clawdTapped = Notification.Name("clawdT
 import SwiftUI
 
 struct ExpandedView: View {
-    var model: AppModel
+    let model: AppModel   // passed-in @Observable — plain property, NOT @State
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -1197,7 +1197,7 @@ extension Notification.Name {
 import SwiftUI
 
 struct IslandView: View {
-    @State var model: AppModel
+    let model: AppModel   // passed-in @Observable — plain property, NOT @State
 
     var body: some View {
         Group {
