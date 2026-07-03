@@ -111,25 +111,34 @@ actor ClaudeAPIService {
     // MARK: - cookie stores
 
     private func readCookies(from source: Source) -> [String: String]? {
-        guard let db = openCopy(of: source.path) else { return nil }
-        defer { sqlite3_close(db); }
-        if let service = source.keychainService {
-            return readChromium(db, service: service)
-        } else {
-            return readFirefox(db)
+        let fm = FileManager.default
+        let suffixes = ["", "-wal", "-shm"]
+        let base = fm.temporaryDirectory
+            .appendingPathComponent("cn-\(abs(source.path.path.hashValue))-\(getpid()).sqlite")
+        // Copy the main DB *and* its WAL/SHM sidecars, so cookies written by a currently-running
+        // app/browser (which live in the -wal file until checkpoint) are included.
+        var copiedMain = false
+        for s in suffixes {
+            let from = URL(fileURLWithPath: source.path.path + s)
+            let to = URL(fileURLWithPath: base.path + s)
+            try? fm.removeItem(at: to)
+            if (try? fm.copyItem(at: from, to: to)) != nil, s.isEmpty { copiedMain = true }
         }
-    }
+        guard copiedMain else { return nil }
+        defer { for s in suffixes { try? fm.removeItem(at: URL(fileURLWithPath: base.path + s)) } }
 
-    /// Copy the (possibly locked) SQLite file to temp and open it read-only.
-    private func openCopy(of path: URL) -> OpaquePointer? {
-        let tmp = FileManager.default.temporaryDirectory
-            .appendingPathComponent("cn-\(abs(path.hashValue))-\(getpid()).sqlite")
-        try? FileManager.default.removeItem(at: tmp)
-        guard (try? FileManager.default.copyItem(at: path, to: tmp)) != nil else { return nil }
+        // Read-WRITE open on the *copy* lets SQLite apply the WAL, so we see the latest cookies.
         var db: OpaquePointer?
-        let ok = sqlite3_open_v2(tmp.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK
-        try? FileManager.default.removeItem(at: tmp)   // opened handle keeps the data
-        return ok ? db : nil
+        guard sqlite3_open(base.path, &db) == SQLITE_OK, let handle = db else {
+            if db != nil { sqlite3_close(db) }
+            return nil
+        }
+        defer { sqlite3_close(handle) }
+        if let service = source.keychainService {
+            return readChromium(handle, service: service)
+        } else {
+            return readFirefox(handle)
+        }
     }
 
     private func readChromium(_ db: OpaquePointer, service: String) -> [String: String]? {
