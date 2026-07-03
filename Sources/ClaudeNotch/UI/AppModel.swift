@@ -39,6 +39,13 @@ final class AppModel {
         if statuslineUsage != nil { return "terminal" }
         return "estimate"
     }
+    /// True when live limits exist but haven't refreshed recently (fetches failing) — the UI
+    /// dims the numbers so a frozen value is never shown as if it were current.
+    var isStale: Bool {
+        guard let f = limits?.fetchedAt else { return false }
+        return Date().timeIntervalSince(f) > staleAfter
+    }
+    private let staleAfter: TimeInterval = 150   // ~2–3 missed 60s fetches
 
     private var home: URL { FileManager.default.homeDirectoryForCurrentUser }
     private var usageFileURL: URL { home.appendingPathComponent(".claude/notch-usage.json") }
@@ -66,9 +73,11 @@ final class AppModel {
     func setAvatar(_ s: AvatarStyle) { avatarStyle = s; AvatarStyle.selected = s }
 
     /// Fetch live claude.ai limits off-main (Keychain prompt appears on first run).
+    /// Only replaces the last-known-good limits with a response that actually carries a
+    /// session %, so a partial/failed read can never clobber correct data.
     func fetchLimits() {
         Task { [claudeAPI] in
-            if let l = await claudeAPI.fetch() { self.limits = l }
+            if let l = await claudeAPI.fetch(), l.sessionPct != nil { self.limits = l }
         }
     }
 

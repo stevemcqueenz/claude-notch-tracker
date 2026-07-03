@@ -1,5 +1,9 @@
 # Claude Notch 🦀
 
+<video src="https://github.com/stevemcqueenz/claude-notch-tracker/raw/main/docs/demo.mp4" poster="https://github.com/stevemcqueenz/claude-notch-tracker/raw/main/docs/demo-poster.png" controls muted width="820"></video>
+
+_If the player doesn't load, [watch the demo](docs/demo.mp4)._
+
 A **Dynamic Island for your Mac's notch** that shows your Claude usage at a glance —
 with Clawd the crab. The same 5-hour, 7-day, and credit numbers you see in Claude
 Desktop, live in the notch.
@@ -7,11 +11,15 @@ Desktop, live in the notch.
 > Collapsed, it's just Clawd + your session % beside the camera. Click it and the
 > island glides open into a tile grid; click away and it glides shut.
 
-## Demo
+## Screenshots
 
-<video src="https://github.com/stevemcqueenz/claude-notch-tracker/raw/main/docs/demo.mp4" poster="https://github.com/stevemcqueenz/claude-notch-tracker/raw/main/docs/demo-poster.png" controls muted width="720"></video>
+**Collapsed** — Clawd + your live session % in the notch:
 
-_If the player doesn't load, [watch the demo](docs/demo.mp4)._
+![Collapsed island](docs/collapsed.png)
+
+**Expanded** — click for the full breakdown:
+
+![Expanded island](docs/expanded.png)
 
 ## Features
 

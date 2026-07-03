@@ -100,6 +100,7 @@ struct IslandView: View {
                     .frame(width: 14, height: 14)
             }
             .frame(width: wing, height: closedH)
+            .opacity(model.isStale ? 0.5 : 1)          // dim when data isn't fresh
             .contentShape(Rectangle())
             .onTapGesture { model.isExpanded.toggle() }
         }
@@ -119,12 +120,16 @@ struct IslandView: View {
                 tile("tokens today", s.isEmpty ? "—" : Fmt.tokens(s.tokensToday), height: .compact)
                 tile("plan", shortPlan, height: .compact)
             }
+            .opacity(model.isStale ? 0.55 : 1)         // dim live limits when not fresh
             HStack {
-                Text(model.lastFetch.map { "Updated \(Fmt.ago($0)) ago" } ?? "token estimate")
+                Text(model.lastFetch.map { "Updated \(Fmt.ago($0)) ago" + (model.isStale ? " · reconnecting" : "") }
+                     ?? "token estimate")
+                    .foregroundStyle(model.isStale ? Color(red: 0.96, green: 0.70, blue: 0.20)
+                                                    : .white.opacity(0.4))
                 Spacer()
-                Text(model.usageSource)
+                Text(model.usageSource).foregroundStyle(.white.opacity(0.4))
             }
-            .font(.system(size: 10)).foregroundStyle(.white.opacity(0.4))
+            .font(.system(size: 10))
         }
         .padding(.horizontal, 12).padding(.top, 6).padding(.bottom, 9)
     }
