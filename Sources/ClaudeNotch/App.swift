@@ -24,8 +24,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.start()
         monitor.start { [weak self] in self?.sync() }   // computes notch geometry first
 
-        let islandWidth = (monitor.notchWidth > 0 ? monitor.notchWidth : 220) + 200
-        window = IslandWindow(model: model, width: islandWidth)
+        let notchW = monitor.notchWidth > 0 ? monitor.notchWidth : 190   // synthetic on non-notch
+        let topInset = monitor.notchHeight > 0 ? monitor.notchHeight : 32
+        window = IslandWindow(model: model, notchWidth: notchW, topInset: topInset)
         statusItem = StatusItemController(model: model)
 
         observeExpansion()

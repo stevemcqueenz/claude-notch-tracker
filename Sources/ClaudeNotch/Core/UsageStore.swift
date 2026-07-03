@@ -44,7 +44,11 @@ final class UsageStore {
             .filter { $0.sessionId == activeSession }
             .reduce(0) { $0 + $1.totalTokens }
 
-        let active = BlockCalculator.activeBlock(from: events, now: now)
+        let blocks = BlockCalculator.blocks(from: events)
+        let active = blocks.last.flatMap { $0.contains(now) ? $0 : nil }
+        let maxBlockTokens = blocks.map(\.totalTokens).max() ?? 0
+        let estimate = maxBlockTokens > 0
+            ? min(1, Double(active?.totalTokens ?? 0) / Double(maxBlockTokens)) : 0
 
         return UsageSnapshot(
             blockRemaining: active?.remaining(at: now),
@@ -53,6 +57,7 @@ final class UsageStore {
             tokensToday: tokensToday,
             costToday: costToday,
             activeSessionTokens: activeSessionTokens,
-            topModel: topModel)
+            topModel: topModel,
+            blockUsageEstimate: estimate)
     }
 }

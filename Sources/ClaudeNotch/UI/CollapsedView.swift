@@ -18,36 +18,13 @@ enum Fmt {
     static func usd(_ v: Double) -> String { String(format: "$%.2f", v) }
 }
 
-/// The pill row shared by the collapsed island and the top of the expanded island:
-/// Clawd on the left, a gap for the physical notch, block-% + ring on the right.
-struct IslandTopRow: View {
-    let model: AppModel
-
-    var body: some View {
-        HStack(spacing: 0) {
-            AvatarView(style: AvatarStyle.selected, active: !model.isPaused)
-                .onTapGesture { NotificationCenter.default.post(name: .clawdTapped, object: nil) }
-            Spacer(minLength: 80)   // clears the physical notch in the center
-            HStack(spacing: 8) {
-                Text(model.snapshot.blockRemaining == nil
-                     ? "—" : Fmt.pct(model.snapshot.blockFractionElapsed))
-                    .font(.system(size: 13, weight: .semibold)).monospacedDigit()
-                    .foregroundStyle(.white)
-                Ring(fraction: model.snapshot.blockFractionElapsed,
-                     state: model.snapshot.ringState)
-                    .frame(width: 20, height: 20)
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { model.isExpanded.toggle() }
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 38)
+/// Ring colour thresholds for a usage fraction (0…1 consumed).
+func ringState(for used: Double) -> RingState {
+    switch used {
+    case ..<0.66: return .ok
+    case ..<0.85: return .warn
+    default:      return .critical
     }
-}
-
-struct CollapsedView: View {
-    let model: AppModel   // passed-in @Observable — plain property, NOT @State
-    var body: some View { IslandTopRow(model: model) }
 }
 
 extension Notification.Name {

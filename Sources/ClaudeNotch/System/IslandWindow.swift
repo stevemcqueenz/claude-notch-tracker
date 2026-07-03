@@ -8,10 +8,11 @@ final class IslandWindow {
     private let hosting: NSHostingView<IslandView>
     private let width: CGFloat
 
-    init(model: AppModel, width: CGFloat) {
-        self.width = width
-        hosting = NSHostingView(rootView: IslandView(model: model, width: width))
-        panel = NSPanel(contentRect: .init(x: 0, y: 0, width: width, height: 40),
+    init(model: AppModel, notchWidth: CGFloat, topInset: CGFloat) {
+        width = 56 + notchWidth + 56   // wing + camera gap + wing (matches IslandView)
+        hosting = NSHostingView(rootView:
+            IslandView(model: model, notchWidth: notchWidth, topInset: topInset))
+        panel = NSPanel(contentRect: .init(x: 0, y: 0, width: width, height: max(topInset, 30)),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered, defer: false)
         panel.level = .statusBar
@@ -24,8 +25,8 @@ final class IslandWindow {
         panel.ignoresMouseEvents = false
     }
 
-    /// Width is fixed; only the height (and top-anchored origin) changes, so the
-    /// island grows straight down from the notch instead of resizing sideways.
+    /// Width is fixed; only the height (and top-anchored origin) changes, so the island
+    /// grows straight down from the notch instead of resizing sideways.
     func reposition() {
         hosting.layoutSubtreeIfNeeded()
         let height = hosting.fittingSize.height
