@@ -1502,16 +1502,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = StatusItemController(model: model)
 
         monitor.start { [weak self] in self?.sync() }
+        observeExpansion()   // re-arming observer; resizes panel on every expand/collapse
 
-        // Re-position/re-show as the snapshot changes size (expand/collapse).
-        withObservationTracking { _ = model.isExpanded } onChange: { [weak self] in
-            Task { @MainActor in self?.window.reposition(notchWidth: self?.monitor.notchWidth ?? 0) }
-        }
         NotificationCenter.default.addObserver(forName: .avatarChanged, object: nil,
             queue: .main) { [weak self] _ in Task { @MainActor in
                 self?.window.reposition(notchWidth: self?.monitor.notchWidth ?? 0) } }
 
         sync()
+    }
+
+    /// withObservationTracking fires once, so re-arm it after each change to keep
+    /// tracking isExpanded. Repositioning on the next runloop lets SwiftUI apply
+    /// the new content size before we read fittingSize.
+    private func observeExpansion() {
+        withObservationTracking {
+            _ = model.isExpanded
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.window.reposition(notchWidth: self.monitor.notchWidth)
+                self.observeExpansion()
+            }
+        }
     }
 
     private func sync() {
