@@ -10,6 +10,11 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-03-claude-notch-usage-tracker-design.md`
 
+> **Toolchain note (required for tests):** `swift test` needs the full Xcode
+> toolchain, not CommandLineTools. Prefix every test command with
+> `export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`.
+> `swift build` works under either toolchain.
+
 ---
 
 ## File Structure
@@ -155,7 +160,7 @@ import Foundation
         let events = try LogParser.parse(fileURL: fixtureURL("basic"))
         let e = try #require(events.first)
         // 2026-07-03T19:31:34.147Z
-        #expect(abs(e.timestamp.timeIntervalSince1970 - 1783193494.147) < 0.01)
+        #expect(abs(e.timestamp.timeIntervalSince1970 - 1783107094.147) < 0.01)
     }
 }
 ```
