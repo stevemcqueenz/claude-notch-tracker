@@ -1273,9 +1273,11 @@ final class AppMonitor {
     }
 
     private func updateClaude() {
+        // Exact bundle-id match only — a loose contains("claude") would
+        // false-positive on other apps (e.g. third-party usage trackers).
         let running = NSWorkspace.shared.runningApplications.contains {
-            guard let id = $0.bundleIdentifier?.lowercased() else { return false }
-            return claudeBundleIDs.contains(id) || id.contains("claude")
+            guard let id = $0.bundleIdentifier else { return false }
+            return claudeBundleIDs.contains(id)
         }
         if running != claudeRunning { claudeRunning = running; onChange?() }
     }
