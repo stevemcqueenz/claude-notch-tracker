@@ -1,8 +1,8 @@
 # Claude Notch 🦀
 
-<video src="https://github.com/stevemcqueenz/claude-notch-tracker/raw/main/docs/demo.mp4" poster="https://github.com/stevemcqueenz/claude-notch-tracker/raw/main/docs/demo-poster.png" controls muted width="820"></video>
+![Claude Notch — expand and collapse](docs/demo.gif)
 
-_If the player doesn't load, [watch the demo](docs/demo.mp4)._
+_[Watch the full demo video ↗](docs/demo.mp4)_
 
 A **Dynamic Island for your Mac's notch** that shows your Claude usage at a glance —
 with Clawd the crab. The same 5-hour, 7-day, and credit numbers you see in Claude
