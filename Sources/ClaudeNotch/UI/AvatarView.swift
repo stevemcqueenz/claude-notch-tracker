@@ -1,50 +1,58 @@
 import SwiftUI
 import AppKit
 
+/// Decodes the bundled base64 PNG animation frames (MIT, see Assets/*.swift headers).
+enum AvatarFrames {
+    static let crab: [NSImage] = decode(clawdCrabFramePNGs)    // walking Clawd, full color
+    static let spark: [NSImage] = decode(claudeSparkFramePNGs) // alpha masks, tinted at runtime
+
+    private static func decode(_ b64s: [String]) -> [NSImage] {
+        b64s.compactMap { Data(base64Encoded: $0).flatMap(NSImage.init(data:)) }
+    }
+}
+
 struct AvatarView: View {
     var style: AvatarStyle
     var active: Bool
-    @State private var wiggle = false
+    private let fps = 10.0
+
+    private var clay: Color { Color(red: 0.85, green: 0.47, blue: 0.34) }
 
     var body: some View {
-        Group {
-            switch style {
-            case .clawd:  clawd
-            case .spark:  spark
-            case .custom: custom
-            }
+        TimelineView(.animation(minimumInterval: 1.0 / fps,
+                                paused: !active || style == .custom)) { timeline in
+            frame(at: timeline.date)
         }
-        .frame(width: 24, height: 24)
-        .rotationEffect(.degrees(active && wiggle ? 6 : -6))
-        .animation(active ? .easeInOut(duration: 0.6).repeatForever(autoreverses: true)
-                          : .default, value: wiggle)
-        .onAppear { wiggle = active }
-        .onChange(of: active) { _, now in wiggle = now }
+        .frame(height: 24)
     }
 
-    private var clawd: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(red: 0.85, green: 0.47, blue: 0.34))
-            HStack(spacing: 4) {
-                Circle().fill(.white).frame(width: 4, height: 4)
-                Circle().fill(.white).frame(width: 4, height: 4)
-            }.offset(y: -1)
+    @ViewBuilder private func frame(at date: Date) -> some View {
+        switch style {
+        case .clawd: raster(AvatarFrames.crab, at: date, tinted: false)
+        case .spark: raster(AvatarFrames.spark, at: date, tinted: true)
+        case .custom: customImage
         }
     }
 
-    private var spark: some View {
-        Image(systemName: "sparkle")
-            .resizable().scaledToFit()
-            .foregroundStyle(Color(red: 0.85, green: 0.47, blue: 0.34))
+    @ViewBuilder private func raster(_ frames: [NSImage], at date: Date, tinted: Bool) -> some View {
+        if frames.isEmpty {
+            Image(systemName: "sparkle").resizable().scaledToFit().foregroundStyle(clay)
+        } else {
+            let idx = active ? Int(date.timeIntervalSinceReferenceDate * fps) % frames.count : 0
+            let base = Image(nsImage: frames[idx])
+            (tinted ? base.renderingMode(.template) : base)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .foregroundStyle(clay)   // tints only template (spark); ignored for color crab
+        }
     }
 
-    private var custom: some View {
-        Group {
-            if let p = AvatarStyle.customImagePath, let img = NSImage(contentsOfFile: p) {
-                Image(nsImage: img).resizable().scaledToFit()
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-            } else { clawd }
+    @ViewBuilder private var customImage: some View {
+        if let p = AvatarStyle.customImagePath, let img = NSImage(contentsOfFile: p) {
+            Image(nsImage: img).resizable().scaledToFit()
+        } else {
+            raster(AvatarFrames.crab, at: .distantPast, tinted: false)
         }
     }
 }

@@ -18,40 +18,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let monitor = AppMonitor()
     var window: IslandWindow!
     var statusItem: StatusItemController!
+    private var clickMonitor: Any?
 
     func applicationDidFinishLaunching(_ note: Notification) {
         model.start()
-        window = IslandWindow(model: model)
+        monitor.start { [weak self] in self?.sync() }   // computes notch geometry first
+
+        let islandWidth = (monitor.notchWidth > 0 ? monitor.notchWidth : 220) + 200
+        window = IslandWindow(model: model, width: islandWidth)
         statusItem = StatusItemController(model: model)
 
-        monitor.start { [weak self] in self?.sync() }
         observeExpansion()
 
         NotificationCenter.default.addObserver(forName: .avatarChanged, object: nil,
-            queue: .main) { [weak self] _ in Task { @MainActor in
-                self?.window.reposition(notchWidth: self?.monitor.notchWidth ?? 0) } }
+            queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.window.reposition() } }
 
         sync()
     }
 
     /// withObservationTracking fires once, so re-arm after each change to keep
-    /// tracking isExpanded. Reposition on the next runloop so SwiftUI applies the
-    /// new content size before we read fittingSize.
+    /// tracking isExpanded. Runs on the next runloop so SwiftUI applies the new
+    /// content size before we read fittingSize.
     private func observeExpansion() {
         withObservationTracking {
             _ = model.isExpanded
         } onChange: { [weak self] in
             Task { @MainActor in
                 guard let self else { return }
-                self.window.reposition(notchWidth: self.monitor.notchWidth)
+                self.window.reposition()
+                self.updateClickMonitor()
                 self.observeExpansion()
             }
         }
     }
 
+    /// While expanded, any click outside the island collapses it.
+    private func updateClickMonitor() {
+        if model.isExpanded, clickMonitor == nil {
+            clickMonitor = NSEvent.addGlobalMonitorForEvents(
+                matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+                    Task { @MainActor in self?.model.isExpanded = false }
+                }
+        } else if !model.isExpanded, let m = clickMonitor {
+            NSEvent.removeMonitor(m)
+            clickMonitor = nil
+        }
+    }
+
     private func sync() {
         model.claudeRunning = monitor.claudeRunning
-        window.reposition(notchWidth: monitor.notchWidth)
+        window.reposition()
         if monitor.claudeRunning { window.show() } else { window.hide() }
     }
 }
