@@ -67,6 +67,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func sync() {
+        // monitor.start() fires this callback during start(), before `window` exists.
+        guard let window else { return }
         model.claudeRunning = monitor.claudeRunning
         window.reposition()
         if monitor.claudeRunning { window.show() } else { window.hide() }
