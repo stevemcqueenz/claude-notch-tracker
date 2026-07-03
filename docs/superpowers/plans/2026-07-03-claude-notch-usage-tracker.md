@@ -802,12 +802,69 @@ git commit -m "feat: FSEvents log watcher feeding live snapshots"
 
 ---
 
-## Task 6: AppModel (@Observable root state)
+## Task 6: AppModel (@Observable root state) — background parsing
 
 **Files:**
+- Create: `Sources/ClaudeNotch/Core/LogLoader.swift`
 - Create: `Sources/ClaudeNotch/UI/AppModel.swift`
+- Modify: `Sources/ClaudeNotch/Core/ClaudePaths.swift` (add `recentLogFiles(within:)`)
+- Modify: `Sources/ClaudeNotch/Core/UsageStore.swift` (add `ingest(fileURL:events:)`)
 
-- [ ] **Step 1: Write `AppModel.swift`**
+**Why this shape:** parsing all of `~/.claude` is ~280 MB / ~12 s on a real machine —
+doing it synchronously on `@MainActor` would freeze the island at launch. So: parse
+off the main actor in a small `actor`, and only scan **recently-modified** files for
+the live snapshot (the 5-hour block and "today" only need recent events; full history
+is a future History view). `UsageEvent` is `Sendable`, so parsed results cross back
+to the main actor safely.
+
+- [ ] **Step 1: Add `recentLogFiles(within:)` to `ClaudePaths.swift`**
+
+Append this method inside `enum ClaudePaths`:
+
+```swift
+    /// Log files modified within the last `days` days (cheap stat, no parse).
+    /// Falls back to all files if none are recent.
+    static func recentLogFiles(within days: Int) -> [URL] {
+        let cutoff = Date().addingTimeInterval(-Double(days) * 86_400)
+        let all = allLogFiles()
+        let recent = all.filter { url in
+            let d = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate
+            return (d ?? .distantPast) >= cutoff
+        }
+        return recent.isEmpty ? all : recent
+    }
+```
+
+- [ ] **Step 2: Add a pre-parsed ingest to `UsageStore.swift`**
+
+Add this method to `UsageStore` (keep the existing `ingest(fileURL:)` for tests):
+
+```swift
+    /// Store already-parsed events for a file (used when parsing happened off-main).
+    func ingest(fileURL: URL, events: [UsageEvent]) {
+        eventsByFile[fileURL] = events
+    }
+```
+
+- [ ] **Step 3: Write `LogLoader.swift`** (background parse actor)
+
+```swift
+import Foundation
+
+/// Parses log files off the main actor. UsageEvent is Sendable, so the
+/// returned tuples cross back to the caller's actor safely.
+actor LogLoader {
+    func parse(_ files: [URL]) -> [(url: URL, events: [UsageEvent])] {
+        files.compactMap { url in
+            guard let events = try? LogParser.parse(fileURL: url) else { return nil }
+            return (url, events)
+        }
+    }
+}
+```
+
+- [ ] **Step 4: Write `AppModel.swift`**
 
 ```swift
 import Foundation
@@ -821,40 +878,46 @@ final class AppModel {
     var claudeRunning = false
 
     private let store = UsageStore()
+    private let loader = LogLoader()
     private var watcher: LogWatcher?
     private var ticker: Timer?
 
     func start() {
-        for f in ClaudePaths.allLogFiles() { try? store.ingest(fileURL: f) }
-        refresh()
         watcher = LogWatcher { [weak self] urls in
             guard let self, !self.isPaused else { return }
-            for u in urls { try? self.store.ingest(fileURL: u) }
-            self.refresh()
+            Task { await self.ingest(urls) }
         }
         watcher?.start()
         // Re-tick each minute so "remaining" and ring stay current without new logs.
         ticker = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
         }
+        // Initial load: only recent files, parsed off-main so launch never blocks.
+        Task { await ingest(ClaudePaths.recentLogFiles(within: 2)) }
     }
 
     func togglePause() { isPaused.toggle(); if !isPaused { refresh() } }
+
+    private func ingest(_ files: [URL]) async {
+        let parsed = await loader.parse(files)      // runs on LogLoader actor (off main)
+        for item in parsed { store.ingest(fileURL: item.url, events: item.events) }
+        refresh()
+    }
 
     func refresh() { snapshot = store.snapshot(now: Date()) }
 }
 ```
 
-- [ ] **Step 2: Build**
+- [ ] **Step 5: Build**
 
 Run: `swift build`
-Expected: `Build complete!`
+Expected: `Build complete!` (no concurrency errors — `UsageEvent`/tuples are Sendable).
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add Sources/ClaudeNotch/UI/AppModel.swift
-git commit -m "feat: @Observable AppModel wiring store + watcher + minute ticker"
+git add Sources/ClaudeNotch/Core/LogLoader.swift Sources/ClaudeNotch/UI/AppModel.swift Sources/ClaudeNotch/Core/ClaudePaths.swift Sources/ClaudeNotch/Core/UsageStore.swift
+git commit -m "feat: @Observable AppModel with off-main parsing and recent-file scan"
 ```
 
 ---
