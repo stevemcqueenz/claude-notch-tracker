@@ -8,6 +8,11 @@ final class UsageStore {
         eventsByFile[fileURL] = try LogParser.parse(fileURL: fileURL)
     }
 
+    /// Store already-parsed events for a file (used when parsing happened off-main).
+    func ingest(fileURL: URL, events: [UsageEvent]) {
+        eventsByFile[fileURL] = events
+    }
+
     func remove(fileURL: URL) { eventsByFile[fileURL] = nil }
 
     private func allEvents() -> [UsageEvent] {
