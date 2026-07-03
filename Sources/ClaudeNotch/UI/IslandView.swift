@@ -1,6 +1,21 @@
 import SwiftUI
 import AppKit
 
+/// Top-anchors the pill inside the fixed full-width window, horizontally centered on the notch.
+struct IslandRootView: View {
+    let model: AppModel
+    let notchWidth: CGFloat
+    let topInset: CGFloat
+
+    var body: some View {
+        VStack(spacing: 0) {
+            IslandView(model: model, notchWidth: notchWidth, topInset: topInset)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+}
+
 /// The notch-fused black island. Closed: Clawd + session-% flanking the camera. Expanded: it
 /// grows taller (never wider), dropping a tile grid below the notch. The NotchShape's radii
 /// animate, so it morphs like the notch itself growing.

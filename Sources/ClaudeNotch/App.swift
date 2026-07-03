@@ -33,16 +33,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sync()
     }
 
-    /// withObservationTracking fires once, so re-arm after each change to keep
-    /// tracking isExpanded. Runs on the next runloop so SwiftUI applies the new
-    /// content size before we read fittingSize.
+    /// withObservationTracking fires once, so re-arm after each change to keep tracking
+    /// isExpanded. Only the invisible click-zone is resized here — the window and the pill
+    /// animation are untouched, so nothing jumps.
     private func observeExpansion() {
         withObservationTracking {
             _ = model.isExpanded
         } onChange: { [weak self] in
             Task { @MainActor in
                 guard let self else { return }
-                self.window.reposition()
+                self.window.updateInteractiveZone()
                 self.updateClickMonitor()
                 self.observeExpansion()
             }
@@ -66,7 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // monitor.start() fires this callback during start(), before `window` exists.
         guard let window else { return }
         model.claudeRunning = monitor.claudeRunning
-        window.reposition()
+        window.updateInteractiveZone()
         if monitor.claudeRunning { window.show() } else { window.hide() }
     }
 }
