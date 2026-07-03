@@ -27,9 +27,9 @@ struct AvatarView: View {
 
     @ViewBuilder private func frame(at date: Date) -> some View {
         switch style {
-        case .clawd:      raster(AvatarFrames.crab, at: date, tint: nil)      // full colour
-        case .clawdWhite: raster(AvatarFrames.crab, at: date, tint: .white)   // white silhouette
-        case .spark:      raster(AvatarFrames.spark, at: date, tint: clay)    // tinted spark
+        case .clawd:      raster(AvatarFrames.crab, at: date, tint: nil)                // full colour
+        case .clawdWhite: raster(AvatarFrames.crab, at: date, tint: nil).saturation(0)  // grey (keeps eyes)
+        case .spark:      raster(AvatarFrames.spark, at: date, tint: clay)              // tinted spark
         }
     }
 

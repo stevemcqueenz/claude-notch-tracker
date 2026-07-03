@@ -8,6 +8,19 @@ enum Fmt {
     static func pct(_ fraction: Double) -> String {
         "\(Int((fraction * 100).rounded()))%"
     }
+    /// "1h 10m" (under a day) or "4d 17h" (a day or more).
+    static func until(_ date: Date) -> String {
+        let s = max(0, Int(date.timeIntervalSinceNow))
+        let d = s / 86_400, h = (s % 86_400) / 3600, m = (s % 3600) / 60
+        return d > 0 ? "\(d)d \(h)h" : "\(h)h \(String(format: "%02d", m))m"
+    }
+    /// "4s" / "2m" / "1h" — compact age of a timestamp.
+    static func ago(_ date: Date) -> String {
+        let s = max(0, Int(-date.timeIntervalSinceNow))
+        if s < 60 { return "\(s)s" }
+        if s < 3600 { return "\(s / 60)m" }
+        return "\(s / 3600)h"
+    }
     static func tokens(_ n: Int) -> String {
         switch n {
         case 1_000_000...: return String(format: "%.1fM", Double(n) / 1_000_000)

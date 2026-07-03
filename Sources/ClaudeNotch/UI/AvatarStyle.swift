@@ -12,7 +12,7 @@ enum AvatarStyle: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .clawd:      "Clawd"
-        case .clawdWhite: "Clawd (white)"
+        case .clawdWhite: "Clawd (mono)"
         case .spark:      "Spark"
         }
     }
