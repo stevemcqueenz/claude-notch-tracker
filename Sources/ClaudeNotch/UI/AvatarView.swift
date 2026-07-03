@@ -19,8 +19,7 @@ struct AvatarView: View {
     private var clay: Color { Color(red: 0.85, green: 0.47, blue: 0.34) }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / fps,
-                                paused: !active || style == .custom)) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / fps, paused: !active)) { timeline in
             frame(at: timeline.date)
         }
         .frame(height: 24)
@@ -28,31 +27,24 @@ struct AvatarView: View {
 
     @ViewBuilder private func frame(at date: Date) -> some View {
         switch style {
-        case .clawd: raster(AvatarFrames.crab, at: date, tinted: false)
-        case .spark: raster(AvatarFrames.spark, at: date, tinted: true)
-        case .custom: customImage
+        case .clawd:      raster(AvatarFrames.crab, at: date, tint: nil)      // full colour
+        case .clawdWhite: raster(AvatarFrames.crab, at: date, tint: .white)   // white silhouette
+        case .spark:      raster(AvatarFrames.spark, at: date, tint: clay)    // tinted spark
         }
     }
 
-    @ViewBuilder private func raster(_ frames: [NSImage], at date: Date, tinted: Bool) -> some View {
+    @ViewBuilder private func raster(_ frames: [NSImage], at date: Date, tint: Color?) -> some View {
         if frames.isEmpty {
             Image(systemName: "sparkle").resizable().scaledToFit().foregroundStyle(clay)
         } else {
             let idx = active ? Int(date.timeIntervalSinceReferenceDate * fps) % frames.count : 0
             let base = Image(nsImage: frames[idx])
-            (tinted ? base.renderingMode(.template) : base)
-                .resizable()
-                .interpolation(.high)
-                .scaledToFit()
-                .foregroundStyle(clay)   // tints only template (spark); ignored for color crab
-        }
-    }
-
-    @ViewBuilder private var customImage: some View {
-        if let p = AvatarStyle.customImagePath, let img = NSImage(contentsOfFile: p) {
-            Image(nsImage: img).resizable().scaledToFit()
-        } else {
-            raster(AvatarFrames.crab, at: .distantPast, tinted: false)
+            if let tint {
+                base.renderingMode(.template).resizable().interpolation(.high)
+                    .scaledToFit().foregroundStyle(tint)
+            } else {
+                base.resizable().interpolation(.high).scaledToFit()
+            }
         }
     }
 }

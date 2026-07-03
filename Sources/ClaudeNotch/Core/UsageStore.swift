@@ -44,6 +44,11 @@ final class UsageStore {
             .filter { $0.sessionId == activeSession }
             .reduce(0) { $0 + $1.totalTokens }
 
+        let weekAgo = now.addingTimeInterval(-7 * 86_400)
+        let weeklyTokens = events
+            .filter { $0.timestamp >= weekAgo }
+            .reduce(0) { $0 + $1.totalTokens }
+
         let blocks = BlockCalculator.blocks(from: events)
         let active = blocks.last.flatMap { $0.contains(now) ? $0 : nil }
         let maxBlockTokens = blocks.map(\.totalTokens).max() ?? 0
@@ -57,6 +62,7 @@ final class UsageStore {
             tokensToday: tokensToday,
             costToday: costToday,
             activeSessionTokens: activeSessionTokens,
+            weeklyTokens: weeklyTokens,
             topModel: topModel,
             blockUsageEstimate: estimate)
     }

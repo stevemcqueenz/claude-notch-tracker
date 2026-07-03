@@ -30,11 +30,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = StatusItemController(model: model)
 
         observeExpansion()
-
-        NotificationCenter.default.addObserver(forName: .avatarChanged, object: nil,
-            queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.window.reposition() } }
-
         sync()
     }
 

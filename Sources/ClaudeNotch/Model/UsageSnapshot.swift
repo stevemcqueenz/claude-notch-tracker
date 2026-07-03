@@ -9,6 +9,7 @@ struct UsageSnapshot: Equatable, Sendable {
     var tokensToday: Int
     var costToday: Double
     var activeSessionTokens: Int
+    var weeklyTokens: Int = 0
     var topModel: String?
     /// Rough fallback usage (0…1): active-block tokens ÷ largest block ever seen.
     /// Used only until the authoritative statusline rate-limit % is available.

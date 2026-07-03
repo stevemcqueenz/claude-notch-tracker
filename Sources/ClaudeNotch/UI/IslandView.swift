@@ -11,7 +11,7 @@ struct IslandView: View {
 
     private let wing: CGFloat = 56
     private let iconSize: CGFloat = 18
-    private let dropHeight: CGFloat = 178
+    private let dropHeight: CGFloat = 182
     private let wingInset: CGFloat = 4    // nudge content toward the notch (past the top flare)
 
     private var expanded: Bool { model.isExpanded }
@@ -45,11 +45,12 @@ struct IslandView: View {
 
     private var notchRow: some View {
         HStack(spacing: 0) {
-            AvatarView(style: AvatarStyle.selected, active: !model.isPaused)
+            AvatarView(style: model.avatarStyle, active: !model.isPaused)
                 .frame(width: iconSize, height: iconSize)
                 .frame(width: wing, height: closedH)
                 .offset(x: wingInset)
-                .onTapGesture { NotificationCenter.default.post(name: .clawdTapped, object: nil) }
+                .onTapGesture { model.cycleAvatar() }   // click Clawd to swap styles
+                .help("Click to change the icon")
 
             Color.clear.frame(width: gap, height: closedH)
 
@@ -71,7 +72,7 @@ struct IslandView: View {
 
     private var dropDown: some View {
         let s = model.snapshot
-        return VStack(alignment: .leading, spacing: 10) {
+        return VStack(alignment: .leading, spacing: 9) {
             HStack(alignment: .firstTextBaseline) {
                 Text(model.sessionUsage.map { "Session \(Fmt.pct($0)) used" } ?? "Session usage —")
                     .font(.system(size: 12.5, weight: .semibold)).foregroundStyle(.white)
@@ -94,10 +95,19 @@ struct IslandView: View {
                 }
             }
 
-            HStack(spacing: 6) {
-                pill("Settings") { NotificationCenter.default.post(name: .openSettings, object: nil) }
-                pill("Quit") { NSApp.terminate(nil) }
+            // 7-day (weekly) plan limit
+            HStack {
+                Text("7-day usage").font(.system(size: 10.5)).foregroundStyle(.white.opacity(0.5))
+                Text(Fmt.tokens(s.weeklyTokens))
+                    .font(.system(size: 10.5, weight: .medium)).monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.8))
+                Spacer()
+                if let reset = model.weeklyResetDate {
+                    Text("resets \(reset.formatted(.dateTime.month().day()))")
+                        .font(.system(size: 10.5)).foregroundStyle(.white.opacity(0.5))
+                }
             }
+            .padding(.top, 1)
         }
         .padding(.horizontal, 14).padding(.top, 4).padding(.bottom, 10)
     }
@@ -112,14 +122,5 @@ struct IslandView: View {
         .padding(.horizontal, 10).padding(.vertical, 8)
         .background(Color.white.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    private func pill(_ title: String, _ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title).font(.system(size: 11)).foregroundStyle(.white.opacity(0.85))
-                .frame(maxWidth: .infinity).padding(.vertical, 6)
-                .background(Color.white.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-        }.buttonStyle(.plain)
     }
 }

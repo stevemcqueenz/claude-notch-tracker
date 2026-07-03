@@ -2,51 +2,63 @@ import AppKit
 import SwiftUI
 
 @MainActor
-final class StatusItemController {
+final class StatusItemController: NSObject, NSMenuDelegate {
     private let item: NSStatusItem
     private let model: AppModel
-    private var settingsWindow: NSWindow?
 
     init(model: AppModel) {
         self.model = model
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        super.init()
         item.button?.image = NSImage(systemSymbolName: "gauge.medium",
             accessibilityDescription: "Claude usage")
-        rebuildMenu()
-        NotificationCenter.default.addObserver(forName: .openSettings, object: nil,
-            queue: .main) { [weak self] _ in Task { @MainActor in self?.openSettings() } }
-        NotificationCenter.default.addObserver(forName: .clawdTapped, object: nil,
-            queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.item.button?.performClick(nil) } }
-    }
-
-    func rebuildMenu() {
         let menu = NSMenu()
-        let pause = NSMenuItem(title: model.isPaused ? "Resume tracking" : "Pause tracking",
-            action: #selector(togglePause), keyEquivalent: "")
-        pause.target = self; menu.addItem(pause)
-        menu.addItem(.separator())
-        let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings),
-            keyEquivalent: ",")
-        settings.target = self; menu.addItem(settings)
-        let quit = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
-        quit.target = self; menu.addItem(quit)
+        menu.delegate = self          // rebuilt each time it opens (keeps checkmarks fresh)
         item.menu = menu
     }
 
-    @objc private func togglePause() { model.togglePause(); rebuildMenu() }
-    @objc private func quit() { NSApp.terminate(nil) }
+    // Rebuild on open so avatar checkmarks / pause label reflect current state.
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
 
-    @objc private func openSettings() {
-        if settingsWindow == nil {
-            let w = NSWindow(contentRect: .init(x: 0, y: 0, width: 320, height: 160),
-                styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            w.title = "Claude Notch"
-            w.contentView = NSHostingView(rootView: SettingsView())
-            w.center(); w.isReleasedWhenClosed = false
-            settingsWindow = w
+        let iconMenu = NSMenu()
+        for style in AvatarStyle.allCases {
+            let it = NSMenuItem(title: style.label, action: #selector(chooseAvatar(_:)), keyEquivalent: "")
+            it.target = self
+            it.representedObject = style.rawValue
+            it.state = (model.avatarStyle == style) ? .on : .off
+            iconMenu.addItem(it)
         }
-        NSApp.activate(ignoringOtherApps: true)
-        settingsWindow?.makeKeyAndOrderFront(nil)
+        let iconItem = NSMenuItem(title: "Icon", action: nil, keyEquivalent: "")
+        iconItem.submenu = iconMenu
+        menu.addItem(iconItem)
+
+        let pause = NSMenuItem(title: model.isPaused ? "Resume tracking" : "Pause tracking",
+            action: #selector(togglePause), keyEquivalent: "")
+        pause.target = self
+        menu.addItem(pause)
+
+        menu.addItem(.separator())
+        menu.addItem(disabled("Claude Notch v\(AppInfo.version)"))
+        menu.addItem(disabled(AppInfo.tagline))
+        menu.addItem(.separator())
+
+        let quit = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
+        quit.target = self
+        menu.addItem(quit)
     }
+
+    private func disabled(_ title: String) -> NSMenuItem {
+        let it = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        it.isEnabled = false
+        return it
+    }
+
+    @objc private func chooseAvatar(_ sender: NSMenuItem) {
+        if let raw = sender.representedObject as? String, let s = AvatarStyle(rawValue: raw) {
+            model.setAvatar(s)
+        }
+    }
+    @objc private func togglePause() { model.togglePause() }
+    @objc private func quit() { NSApp.terminate(nil) }
 }

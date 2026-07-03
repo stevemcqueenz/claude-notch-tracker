@@ -26,8 +26,3 @@ func ringState(for used: Double) -> RingState {
     default:      return .critical
     }
 }
-
-extension Notification.Name {
-    static let clawdTapped = Notification.Name("clawdTapped")
-    static let openSettings = Notification.Name("openSettings")
-}

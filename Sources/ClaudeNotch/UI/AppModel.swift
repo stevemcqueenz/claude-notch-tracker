@@ -7,24 +7,27 @@ final class AppModel {
     var isExpanded = false
     var isPaused = false
     var claudeRunning = false
+    var avatarStyle: AvatarStyle = AvatarStyle.selected
 
     /// 5-hour session usage, 0…1 consumed. Authoritative value comes from Claude Code's
     /// statusline feed (~/.claude/notch-usage.json); falls back to a token-based estimate.
     private(set) var sessionUsage: Double?
     /// Context window remaining, 0…1, from the statusline feed (nil if unknown).
     private(set) var contextRemaining: Double?
+    /// When the weekly (7-day) plan limit resets, from ~/.claude.json (nil if unknown).
+    private(set) var weeklyResetDate: Date?
 
     private let store = UsageStore()
     private let loader = LogLoader()
     private var watcher: LogWatcher?
     private var ticker: Timer?
 
-    private var usageFileURL: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".claude/notch-usage.json")
-    }
+    private var home: URL { FileManager.default.homeDirectoryForCurrentUser }
+    private var usageFileURL: URL { home.appendingPathComponent(".claude/notch-usage.json") }
+    private var configURL: URL { home.appendingPathComponent(".claude.json") }
 
     func start() {
+        readPlanLimits()
         watcher = LogWatcher { [weak self] urls in
             guard let self, !self.isPaused else { return }
             Task { await self.ingest(urls) }
@@ -38,6 +41,9 @@ final class AppModel {
     }
 
     func togglePause() { isPaused.toggle(); if !isPaused { refresh() } }
+
+    func cycleAvatar() { setAvatar(avatarStyle.next) }
+    func setAvatar(_ s: AvatarStyle) { avatarStyle = s; AvatarStyle.selected = s }
 
     private func ingest(_ files: [URL]) async {
         let parsed = await loader.parse(files)
@@ -65,5 +71,17 @@ final class AppModel {
         } else {
             sessionUsage = snapshot.isEmpty ? nil : snapshot.blockUsageEstimate
         }
+    }
+
+    /// Read the weekly plan-limit reset date from ~/.claude.json (best-effort).
+    private func readPlanLimits() {
+        guard let data = try? Data(contentsOf: configURL),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let gb = root["cachedGrowthBookFeatures"] as? [String: Any],
+              let lattice = gb["tengu_saffron_lattice"] as? [String: Any],
+              let iso = lattice["planLimitsEndDate"] as? String
+        else { return }
+        let fmt = ISO8601DateFormatter()
+        weeklyResetDate = fmt.date(from: iso)
     }
 }
