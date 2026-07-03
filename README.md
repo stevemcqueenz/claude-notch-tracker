@@ -1,25 +1,34 @@
-# Claude Notch 🦀
+<div align="center">
 
-![Claude Notch — expand and collapse](docs/demo.gif)
+# 🦀 Claude Notch
 
-_[Watch the full demo video ↗](docs/demo.mp4)_
+**A Dynamic Island for your Mac's notch — live Claude usage, with Clawd the crab.**
 
-A **Dynamic Island for your Mac's notch** that shows your Claude usage at a glance —
-with Clawd the crab. The same 5-hour, 7-day, and credit numbers you see in Claude
-Desktop, live in the notch.
+<img src="docs/demo.gif" width="640" alt="Claude Notch — expand and collapse" />
 
-> Collapsed, it's just Clawd + your session % beside the camera. Click it and the
-> island glides open into a tile grid; click away and it glides shut.
+<sub><a href="docs/demo.mp4">watch the full demo ↗</a></sub>
+
+<br/>
+
+[![Latest release](https://img.shields.io/github/v/release/stevemcqueenz/claude-notch-tracker?color=CC785C&label=download)](https://github.com/stevemcqueenz/claude-notch-tracker/releases/latest)
+&nbsp;![macOS 14+](https://img.shields.io/badge/macOS-14+-111111?logo=apple&logoColor=white)
+&nbsp;[![License MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+</div>
+
+The same **5-hour**, **7-day**, and **credit** numbers you see in Claude Desktop — live in
+the notch. Collapsed, it's just Clawd + your session % beside the camera; click it and the
+island glides open into a tile grid, click away and it glides shut.
 
 ## Screenshots
 
-**Collapsed** — Clawd + your live session % in the notch:
-
-![Collapsed island](docs/collapsed.png)
-
-**Expanded** — click for the full breakdown:
-
-![Expanded island](docs/expanded.png)
+<div align="center">
+  <img src="docs/collapsed.png" width="620" alt="Collapsed island" /><br/>
+  <sub><b>Collapsed</b> — Clawd + your live session %</sub>
+  <br/><br/>
+  <img src="docs/expanded.png" width="620" alt="Expanded island" /><br/>
+  <sub><b>Expanded</b> — the full breakdown</sub>
+</div>
 
 ## Features
 
