@@ -10,35 +10,83 @@ struct ClaudeLimits: Sendable {
     var weeklyPct: Double?       // 0…1 used (seven_day)
     var weeklyResetsAt: Date?
     var creditsPct: Double?      // 0…1 used (extra_usage), nil if no credits
+    var source: String?          // where the session came from (e.g. "Brave")
     var fetchedAt: Date
 }
 
-/// Reads Claude Desktop's local session (Chromium cookie store, decrypted with the
-/// "Claude Safe Storage" Keychain key) and queries claude.ai for the real usage.
-/// An actor so the blocking Keychain / SQLite / crypto work stays off the main thread.
+/// Finds a logged-in claude.ai session — from Claude Desktop OR any supported browser — and
+/// queries claude.ai for the real usage. An actor so the blocking Keychain / SQLite / crypto
+/// work stays off the main thread.
 actor ClaudeAPIService {
 
-    func fetch() async -> ClaudeLimits? {
-        guard let cookies = readCookies(),
-              let org = cookies["lastActiveOrg"], cookies["sessionKey"] != nil,
-              let url = URL(string: "https://claude.ai/api/organizations/\(org)/usage")
-        else { return nil }
+    private struct Source {
+        let name: String
+        let path: URL
+        let keychainService: String?   // nil => Firefox-style plaintext cookies.sqlite
+    }
 
+    func fetch() async -> ClaudeLimits? {
+        for source in sources() {
+            guard let cookies = readCookies(from: source),
+                  let org = cookies["lastActiveOrg"], cookies["sessionKey"] != nil
+            else { continue }
+            if let limits = await request(org: org, cookies: cookies, source: source.name) {
+                return limits
+            }
+        }
+        return nil
+    }
+
+    /// Candidate session stores, most-likely first. Only those actually present are returned.
+    private func sources() -> [Source] {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let fm = FileManager.default
+        func url(_ rel: String) -> URL { home.appendingPathComponent(rel) }
+        var out: [Source] = []
+
+        let chromium: [(String, String, String)] = [
+            ("Claude Desktop", "Library/Application Support/Claude/Cookies", "Claude Safe Storage"),
+            ("Chrome", "Library/Application Support/Google/Chrome/Default/Cookies", "Chrome Safe Storage"),
+            ("Brave", "Library/Application Support/BraveSoftware/Brave-Browser/Default/Cookies", "Brave Safe Storage"),
+            ("Edge", "Library/Application Support/Microsoft Edge/Default/Cookies", "Microsoft Edge Safe Storage"),
+            ("Arc", "Library/Application Support/Arc/User Data/Default/Cookies", "Arc Safe Storage"),
+        ]
+        for (name, rel, svc) in chromium {
+            let u = url(rel)
+            if fm.fileExists(atPath: u.path) { out.append(Source(name: name, path: u, keychainService: svc)) }
+        }
+
+        for (name, base) in [("Firefox", "Library/Application Support/Firefox/Profiles"),
+                             ("Zen", "Library/Application Support/zen/Profiles")] {
+            let dir = url(base)
+            if let profiles = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) {
+                for prof in profiles {
+                    let ck = prof.appendingPathComponent("cookies.sqlite")
+                    if fm.fileExists(atPath: ck.path) {
+                        out.append(Source(name: name, path: ck, keychainService: nil))
+                    }
+                }
+            }
+        }
+        return out
+    }
+
+    private func request(org: String, cookies: [String: String], source: String) async -> ClaudeLimits? {
+        guard let url = URL(string: "https://claude.ai/api/organizations/\(org)/usage") else { return nil }
         let header = cookies.map { "\($0)=\($1)" }.joined(separator: "; ")
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.setValue(header, forHTTPHeaderField: "Cookie")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)",
                      forHTTPHeaderField: "User-Agent")
-
         guard let (data, resp) = try? await URLSession.shared.data(for: req),
               (resp as? HTTPURLResponse)?.statusCode == 200,
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return nil }
-        return parse(obj)
+        return parse(obj, source: source)
     }
 
-    private func parse(_ obj: [String: Any]) -> ClaudeLimits {
+    private func parse(_ obj: [String: Any], source: String) -> ClaudeLimits {
         func node(_ key: String) -> (Double?, Date?) {
             guard let n = obj[key] as? [String: Any] else { return (nil, nil) }
             let util = (n["utilization"] as? NSNumber)?.doubleValue
@@ -57,53 +105,75 @@ actor ClaudeAPIService {
         let (c, _) = node("extra_usage")
         return ClaudeLimits(sessionPct: s, sessionResetsAt: sr,
                             weeklyPct: w, weeklyResetsAt: wr,
-                            creditsPct: c, fetchedAt: Date())
+                            creditsPct: c, source: source, fetchedAt: Date())
     }
 
-    // MARK: - cookie store
+    // MARK: - cookie stores
 
-    private func readCookies() -> [String: String]? {
-        guard let key = safeStorageKey() else { return nil }
-        let src = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/Claude/Cookies")
+    private func readCookies(from source: Source) -> [String: String]? {
+        guard let db = openCopy(of: source.path) else { return nil }
+        defer { sqlite3_close(db); }
+        if let service = source.keychainService {
+            return readChromium(db, service: service)
+        } else {
+            return readFirefox(db)
+        }
+    }
+
+    /// Copy the (possibly locked) SQLite file to temp and open it read-only.
+    private func openCopy(of path: URL) -> OpaquePointer? {
         let tmp = FileManager.default.temporaryDirectory
-            .appendingPathComponent("cn-cookies-\(getpid()).sqlite")
+            .appendingPathComponent("cn-\(abs(path.hashValue))-\(getpid()).sqlite")
         try? FileManager.default.removeItem(at: tmp)
-        guard (try? FileManager.default.copyItem(at: src, to: tmp)) != nil else { return nil }
-        defer { try? FileManager.default.removeItem(at: tmp) }
-
+        guard (try? FileManager.default.copyItem(at: path, to: tmp)) != nil else { return nil }
         var db: OpaquePointer?
-        guard sqlite3_open(tmp.path, &db) == SQLITE_OK else { return nil }
-        defer { sqlite3_close(db) }
+        let ok = sqlite3_open_v2(tmp.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK
+        try? FileManager.default.removeItem(at: tmp)   // opened handle keeps the data
+        return ok ? db : nil
+    }
+
+    private func readChromium(_ db: OpaquePointer, service: String) -> [String: String]? {
+        guard let key = safeStorageKey(service: service) else { return nil }
         var stmt: OpaquePointer?
         let sql = "SELECT name, encrypted_value FROM cookies WHERE host_key LIKE '%claude.ai%'"
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
         defer { sqlite3_finalize(stmt) }
-
         var out: [String: String] = [:]
         while sqlite3_step(stmt) == SQLITE_ROW {
-            guard let cName = sqlite3_column_text(stmt, 0) else { continue }
+            guard let cName = sqlite3_column_text(stmt, 0), let blob = sqlite3_column_blob(stmt, 1)
+            else { continue }
             let name = String(cString: cName)
-            guard let blob = sqlite3_column_blob(stmt, 1) else { continue }
-            let len = Int(sqlite3_column_bytes(stmt, 1))
-            let enc = Data(bytes: blob, count: len)
+            let enc = Data(bytes: blob, count: Int(sqlite3_column_bytes(stmt, 1)))
             if let val = decrypt(enc, key: key) { out[name] = val }
         }
         return out.isEmpty ? nil : out
     }
 
-    /// The AES key = PBKDF2(SHA1, "Claude Safe Storage" password, "saltysalt", 1003, 16).
-    private func safeStorageKey() -> Data? {
+    private func readFirefox(_ db: OpaquePointer) -> [String: String]? {
+        var stmt: OpaquePointer?
+        let sql = "SELECT name, value FROM moz_cookies WHERE host LIKE '%claude.ai%'"
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
+        defer { sqlite3_finalize(stmt) }
+        var out: [String: String] = [:]
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let cName = sqlite3_column_text(stmt, 0), let cVal = sqlite3_column_text(stmt, 1)
+            else { continue }
+            out[String(cString: cName)] = String(cString: cVal)   // Firefox stores plaintext
+        }
+        return out.isEmpty ? nil : out
+    }
+
+    /// AES key = PBKDF2(SHA1, "<App> Safe Storage" password, "saltysalt", 1003, 16).
+    private func safeStorageKey(service: String) -> Data? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "Claude Safe Storage",
+            kSecAttrService as String: service,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
         var item: CFTypeRef?
         guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
               let pw = item as? Data else { return nil }
-
         var key = Data(count: 16)
         let salt = Array("saltysalt".utf8)
         let ok = key.withUnsafeMutableBytes { kb in
@@ -122,7 +192,7 @@ actor ClaudeAPIService {
     /// domain hash inside the plaintext; try with and without.
     private func decrypt(_ enc: Data, key: Data) -> String? {
         guard enc.count > 3, enc.prefix(3) == Data("v10".utf8) else {
-            return String(data: enc, encoding: .utf8)   // unencrypted cookie
+            return String(data: enc, encoding: .utf8)
         }
         let ct = enc.dropFirst(3)
         let iv = Data(repeating: 0x20, count: 16)

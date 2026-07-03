@@ -35,7 +35,7 @@ final class AppModel {
     var weeklyResetsAt: Date? { limits?.weeklyResetsAt ?? weeklyResetFromConfig }
     var lastFetch: Date? { limits?.fetchedAt }
     var usageSource: String {
-        if limits != nil { return "Claude Desktop" }
+        if let l = limits { return l.source ?? "claude.ai" }
         if statuslineUsage != nil { return "terminal" }
         return "estimate"
     }

@@ -8,8 +8,9 @@ REQUIREMENTS
 ------------
 • macOS 14 or newer (Apple Silicon or Intel), notch or not (it draws
   its own on non-notch Macs).
-• Claude Desktop installed AND signed in to your Claude account.
-  The tracker reads YOUR local Claude Desktop session to show YOUR own
+• A Claude session on your Mac — EITHER Claude Desktop signed in, OR a
+  browser (Chrome, Brave, Edge, Arc, Firefox, Zen) signed in to
+  claude.ai. The tracker reads YOUR own local session to show YOUR own
   usage — nothing of the sender's, nothing leaves your machine.
 
 INSTALL
