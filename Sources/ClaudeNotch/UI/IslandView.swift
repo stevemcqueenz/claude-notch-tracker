@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 /// The notch-fused black island. Closed: Clawd + session-% flanking the camera. Expanded: it
-/// grows taller (never wider), dropping a usage panel below the notch. The NotchShape's radii
+/// grows taller (never wider), dropping a tile grid below the notch. The NotchShape's radii
 /// animate, so it morphs like the notch itself growing.
 struct IslandView: View {
     let model: AppModel
@@ -12,7 +12,7 @@ struct IslandView: View {
     private let wing: CGFloat = 56
     private let iconSize: CGFloat = 18
     private let edgeInset: CGFloat = 12   // keeps content off the pill's flared edges
-    private let dropHeight: CGFloat = 206
+    private let dropHeight: CGFloat = 198
 
     private var expanded: Bool { model.isExpanded }
     private var closedH: CGFloat { max(topInset, 30) }
@@ -67,76 +67,68 @@ struct IslandView: View {
         .padding(.horizontal, edgeInset)
     }
 
-    // MARK: drop-down — usage panel below the notch
+    // MARK: drop-down — tile grid below the notch
 
     private var dropDown: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: "bolt.fill").font(.system(size: 10)).foregroundStyle(.white.opacity(0.6))
-                Text(model.planName ?? "Claude")
-                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(.white.opacity(0.9))
-                Spacer()
+        let s = model.snapshot
+        return VStack(spacing: 8) {
+            LazyVGrid(columns: [.init(.flexible(), spacing: 8), .init(.flexible(), spacing: 8)], spacing: 8) {
+                limitTile("5-Hour", model.sessionUsage, resets: model.sessionResetsAt)
+                limitTile("7-Day", model.weeklyUsage, resets: model.weeklyResetsAt)
+                tile("credits", model.limits?.creditsPct.map { Fmt.pct($0) + " used" } ?? "none")
+                tile("cost today", s.isEmpty ? "—" : Fmt.usd(s.costToday))
+                tile("tokens today", s.isEmpty ? "—" : Fmt.tokens(s.tokensToday))
+                tile("plan", shortPlan)
             }
-            usageBlock("clock", "5-Hour Session", model.sessionUsage, resets: model.sessionResetsAt)
-            usageBlock("calendar", "7-Day Weekly", model.weeklyUsage, resets: model.weeklyResetsAt)
-
-            Rectangle().fill(Color.white.opacity(0.08)).frame(height: 0.5)
-
-            HStack(spacing: 6) {
-                if let f = model.lastFetch {
-                    Text("Updated \(Fmt.ago(f)) ago")
-                } else {
-                    Text("token estimate")
-                }
+            HStack {
+                Text(model.lastFetch.map { "Updated \(Fmt.ago($0)) ago" } ?? "token estimate")
                 Spacer()
-                if !model.snapshot.isEmpty {
-                    Text("\(Fmt.usd(model.snapshot.costToday)) today")
-                }
+                Text(model.usageSource)
             }
-            .font(.system(size: 10.5)).foregroundStyle(.white.opacity(0.45))
+            .font(.system(size: 10)).foregroundStyle(.white.opacity(0.4))
         }
-        .padding(.horizontal, 14).padding(.top, 6).padding(.bottom, 10)
+        .padding(.horizontal, 12).padding(.top, 6).padding(.bottom, 9)
     }
 
-    private func usageBlock(_ icon: String, _ title: String,
-                            _ value: Double?, resets: Date?) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 6) {
-                Image(systemName: icon).font(.system(size: 11)).foregroundStyle(.white.opacity(0.7))
-                Text(title).font(.system(size: 12.5, weight: .medium)).foregroundStyle(.white)
-                Spacer()
-                Text(value.map(Fmt.pct) ?? "—")
-                    .font(.system(size: 13, weight: .semibold)).monospacedDigit()
-                    .foregroundStyle(.white)
-            }
-            UsageBar(fraction: value ?? 0)
-            Text(resets.map { "Resets in \(Fmt.until($0))" } ?? "Resets —")
-                .font(.system(size: 10.5)).foregroundStyle(.white.opacity(0.5))
-        }
+    private var shortPlan: String {
+        (model.planName ?? "Claude").replacingOccurrences(of: "Claude ", with: "")
     }
-}
 
-/// A slim usage bar: grey normally, amber as it fills, red at the limit.
-struct UsageBar: View {
-    var fraction: Double
-
-    private var color: Color {
-        switch ringState(for: fraction) {
-        case .ok: return Color.white.opacity(0.75)
-        case .warn: return Color(red: 0.94, green: 0.62, blue: 0.15)
-        case .critical: return Color(red: 0.89, green: 0.29, blue: 0.29)
+    // A limit tile: label, big colour-coded %, and a "resets in …" subline.
+    private func limitTile(_ label: String, _ value: Double?, resets: Date?) -> some View {
+        tileBox {
+            Text(label).font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
+            Text(value.map(Fmt.pct) ?? "—")
+                .font(.system(size: 16, weight: .semibold)).monospacedDigit()
+                .foregroundStyle(barColor(value ?? 0))
+            Text(resets.map { "resets in \(Fmt.until($0))" } ?? "resets —")
+                .font(.system(size: 9.5)).foregroundStyle(.white.opacity(0.45)).lineLimit(1)
         }
     }
 
-    var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule().fill(Color.white.opacity(0.14))
-                Capsule().fill(color)
-                    .frame(width: max(4, geo.size.width * min(1, max(0, fraction))))
-                    .animation(.easeInOut(duration: 0.3), value: fraction)
-            }
+    // A plain value tile.
+    private func tile(_ label: String, _ value: String) -> some View {
+        tileBox {
+            Text(label).font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
+            Text(value).font(.system(size: 15, weight: .medium)).monospacedDigit()
+                .foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.7)
+            Spacer(minLength: 0)
         }
-        .frame(height: 5)
+    }
+
+    private func tileBox<C: View>(@ViewBuilder _ content: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 2, content: content)
+            .frame(maxWidth: .infinity, minHeight: 48, alignment: .topLeading)
+            .padding(.horizontal, 10).padding(.vertical, 8)
+            .background(Color.white.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func barColor(_ used: Double) -> Color {
+        switch ringState(for: used) {
+        case .ok: return .white
+        case .warn: return Color(red: 0.96, green: 0.70, blue: 0.20)
+        case .critical: return Color(red: 0.92, green: 0.34, blue: 0.34)
+        }
     }
 }

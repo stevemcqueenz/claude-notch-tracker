@@ -9,6 +9,7 @@ struct ClaudeLimits: Sendable {
     var sessionResetsAt: Date?
     var weeklyPct: Double?       // 0…1 used (seven_day)
     var weeklyResetsAt: Date?
+    var creditsPct: Double?      // 0…1 used (extra_usage), nil if no credits
     var fetchedAt: Date
 }
 
@@ -53,8 +54,10 @@ actor ClaudeAPIService {
         }
         let (s, sr) = node("five_hour")
         let (w, wr) = node("seven_day")
+        let (c, _) = node("extra_usage")
         return ClaudeLimits(sessionPct: s, sessionResetsAt: sr,
-                            weeklyPct: w, weeklyResetsAt: wr, fetchedAt: Date())
+                            weeklyPct: w, weeklyResetsAt: wr,
+                            creditsPct: c, fetchedAt: Date())
     }
 
     // MARK: - cookie store
