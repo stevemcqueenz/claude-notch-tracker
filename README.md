@@ -39,9 +39,10 @@ macOS asks your permission via a Keychain prompt on first run.
 ## Install
 
 **Download:** grab the latest `Claude Notch.zip` from
-[Releases](../../releases) → unzip → drag `Claude Notch.app` to Applications.
-First launch: right-click → Open (it's not notarized), then **Always Allow** the
-Keychain prompt. Right-click the island → *Launch at Login* to keep it around.
+[Releases](../../releases) → unzip → drag `Claude Notch.app` to Applications →
+**double-click** to open (it's signed + **notarized**, so no security warning). On
+first run, **Always Allow** the Keychain prompt so it can read your local Claude
+session. Right-click the island → *Launch at Login* to keep it around.
 
 **Build from source:**
 

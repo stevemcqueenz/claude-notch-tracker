@@ -17,11 +17,8 @@ INSTALL
 -------
 1. Unzip this file.
 2. Drag "Claude Notch.app" into your Applications folder.
-3. FIRST launch only — macOS will say the developer "cannot be verified"
-   (the app isn't notarized). To open it anyway:
-      • Right-click the app → Open → Open
-      (or: System Settings → Privacy & Security → "Open Anyway")
-   You only have to do this once.
+3. Double-click it to open — the app is signed and notarized, so there's no
+   "unverified developer" warning.
 4. A Keychain prompt will appear:
    "… wants to use information stored in 'Claude Safe Storage'."
    Click "Always Allow". (This lets it read your local Claude session.)

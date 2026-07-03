@@ -38,16 +38,18 @@ cp "$ROOT/Resources/Info.plist" "$APPDIR/Contents/Info.plist"
 cp "$ROOT/Resources/AppIcon.icns" "$APPDIR/Contents/Resources/AppIcon.icns"
 
 echo "▸ Signing as: $SIGN_ID"
+# No --deep (Quinn: "considered harmful"): the bundle has no nested code, just the
+# main executable, so signing the bundle is sufficient and correct.
 if [ "$SIGN_ID" = "-" ]; then
-  codesign --force --deep --sign - "$APPDIR"
+  codesign --force --sign - "$APPDIR"
 else
-  codesign --force --deep --options runtime --timestamp --sign "$SIGN_ID" "$APPDIR"
-  codesign --verify --deep --strict --verbose=1 "$APPDIR"
+  codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$APPDIR"
+  codesign --verify --strict --verbose=2 "$APPDIR"
 fi
 
 if [ -n "$NOTARY_PROFILE" ] && [ "$SIGN_ID" != "-" ]; then
   echo "▸ Notarizing (this uploads to Apple and waits)…"
-  ditto -c -k --keepParent "$APPDIR" "$DIST/notary.zip"
+  ditto -c -k --sequesterRsrc --keepParent "$APPDIR" "$DIST/notary.zip"
   xcrun notarytool submit "$DIST/notary.zip" --keychain-profile "$NOTARY_PROFILE" --wait
   echo "▸ Stapling ticket…"
   xcrun stapler staple "$APPDIR"
@@ -55,9 +57,8 @@ if [ -n "$NOTARY_PROFILE" ] && [ "$SIGN_ID" != "-" ]; then
   xcrun stapler validate "$APPDIR" && echo "  ✓ stapled + valid"
 fi
 
-echo "▸ Zipping…"
-cp "$ROOT/Resources/README.txt" "$DIST/README.txt"
-( cd "$DIST" && zip -r -q -y "$APP_NAME.zip" "$APP_NAME.app" README.txt )
+echo "▸ Zipping (ditto, signature-safe)…"
+ditto -c -k --sequesterRsrc --keepParent "$APPDIR" "$DIST/$APP_NAME.zip"
 
 echo "✓ Done:"
 echo "   app: $APPDIR"
