@@ -27,7 +27,7 @@ struct IslandView: View {
     private let wing: CGFloat = 56
     private let iconSize: CGFloat = 18
     private let edgeInset: CGFloat = 12   // keeps content off the pill's flared edges
-    private let dropHeight: CGFloat = 198
+    private let dropHeight: CGFloat = 172
 
     private var expanded: Bool { model.isExpanded }
     private var closedH: CGFloat { max(topInset, 30) }
@@ -92,8 +92,8 @@ struct IslandView: View {
                 limitTile("7-Day", model.weeklyUsage, resets: model.weeklyResetsAt)
                 tile("credits", model.limits?.creditsPct.map { Fmt.pct($0) + " used" } ?? "none", height: .compact)
                 tile("cost today", s.isEmpty ? "—" : Fmt.usd(s.costToday), height: .compact)
-                tile("tokens today", s.isEmpty ? "—" : Fmt.tokens(s.tokensToday), height: .tall)
-                tile("plan", shortPlan, height: .tall)
+                tile("tokens today", s.isEmpty ? "—" : Fmt.tokens(s.tokensToday), height: .compact)
+                tile("plan", shortPlan, height: .compact)
             }
             HStack {
                 Text(model.lastFetch.map { "Updated \(Fmt.ago($0)) ago" } ?? "token estimate")
