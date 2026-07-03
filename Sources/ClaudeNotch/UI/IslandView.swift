@@ -73,6 +73,7 @@ struct IslandView: View {
             }
         }
         Button(model.isPaused ? "Resume tracking" : "Pause tracking") { model.togglePause() }
+        Button((LoginItem.isEnabled ? "✓ " : "") + "Launch at Login") { LoginItem.toggle() }
         Divider()
         Button("Claude Notch v\(AppInfo.version) — \(AppInfo.tagline)") {}.disabled(true)
         Divider()

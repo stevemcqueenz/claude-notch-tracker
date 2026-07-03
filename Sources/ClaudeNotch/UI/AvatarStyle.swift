@@ -1,8 +1,22 @@
 import SwiftUI
+import ServiceManagement
 
 enum AppInfo {
     static let version = "0.1.0"
     static let tagline = "Made with Claude"
+}
+
+/// Launch-at-login toggle (only effective when running as a bundled .app).
+enum LoginItem {
+    static var isEnabled: Bool { SMAppService.mainApp.status == .enabled }
+    static func toggle() {
+        do {
+            if isEnabled { try SMAppService.mainApp.unregister() }
+            else { try SMAppService.mainApp.register() }
+        } catch {
+            NSLog("ClaudeNotch login item error: \(error.localizedDescription)")
+        }
+    }
 }
 
 enum AvatarStyle: String, CaseIterable, Identifiable {
