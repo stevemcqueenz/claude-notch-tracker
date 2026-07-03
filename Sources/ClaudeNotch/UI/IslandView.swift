@@ -52,8 +52,31 @@ struct IslandView: View {
                alignment: .top)
         .clipShape(shape)
         .contentShape(shape)
+        .contextMenu { menu }
         .animation(.spring(response: 0.6, dampingFraction: 1.0), value: expanded)
         .animation(.easeInOut(duration: 0.3), value: used)
+    }
+
+    // Right-click menu (replaces the menu-bar item).
+    @ViewBuilder private var menu: some View {
+        Menu("Icon") {
+            ForEach(AvatarStyle.allCases) { style in
+                Button {
+                    model.setAvatar(style)
+                } label: {
+                    if model.avatarStyle == style {
+                        Label(style.label, systemImage: "checkmark")
+                    } else {
+                        Text(style.label)
+                    }
+                }
+            }
+        }
+        Button(model.isPaused ? "Resume tracking" : "Pause tracking") { model.togglePause() }
+        Divider()
+        Button("Claude Notch v\(AppInfo.version) — \(AppInfo.tagline)") {}.disabled(true)
+        Divider()
+        Button("Quit") { NSApp.terminate(nil) }
     }
 
     // MARK: closed row

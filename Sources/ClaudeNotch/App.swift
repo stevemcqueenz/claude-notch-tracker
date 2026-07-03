@@ -17,7 +17,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = AppModel()
     let monitor = AppMonitor()
     var window: IslandWindow!
-    var statusItem: StatusItemController!
     private var clickMonitor: Any?
 
     func applicationDidFinishLaunching(_ note: Notification) {
@@ -27,7 +26,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let notchW = monitor.notchWidth > 0 ? monitor.notchWidth : 190   // synthetic on non-notch
         let topInset = monitor.notchHeight > 0 ? monitor.notchHeight : 32
         window = IslandWindow(model: model, notchWidth: notchW, topInset: topInset)
-        statusItem = StatusItemController(model: model)
 
         observeExpansion()
         sync()
