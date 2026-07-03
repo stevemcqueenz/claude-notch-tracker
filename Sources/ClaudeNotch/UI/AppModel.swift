@@ -13,6 +13,8 @@ final class AppModel {
     private(set) var limits: ClaudeLimits?
     /// Context window remaining, 0…1, from the terminal statusline feed (nil if unknown).
     private(set) var contextRemaining: Double?
+    /// Friendly plan name, e.g. "Claude Max 5x" (from ~/.claude.json).
+    private(set) var planName: String?
     private var statuslineUsage: Double?
     private var weeklyResetFromConfig: Date?
 
@@ -96,11 +98,16 @@ final class AppModel {
     /// Weekly reset fallback from ~/.claude.json (used only until the live fetch lands).
     private func readPlanLimits() {
         guard let data = try? Data(contentsOf: configURL),
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let gb = root["cachedGrowthBookFeatures"] as? [String: Any],
-              let lattice = gb["tengu_saffron_lattice"] as? [String: Any],
-              let iso = lattice["planLimitsEndDate"] as? String
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return }
-        weeklyResetFromConfig = ISO8601DateFormatter().date(from: iso)
+        if let gb = root["cachedGrowthBookFeatures"] as? [String: Any],
+           let lattice = gb["tengu_saffron_lattice"] as? [String: Any],
+           let iso = lattice["planLimitsEndDate"] as? String {
+            weeklyResetFromConfig = ISO8601DateFormatter().date(from: iso)
+        }
+        if let oauth = root["oauthAccount"] as? [String: Any],
+           let tier = oauth["organizationRateLimitTier"] as? String {
+            planName = Fmt.planLabel(tier)
+        }
     }
 }

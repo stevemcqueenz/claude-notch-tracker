@@ -29,6 +29,17 @@ enum Fmt {
         }
     }
     static func usd(_ v: Double) -> String { String(format: "$%.2f", v) }
+
+    /// "default_claude_max_5x" -> "Claude Max 5x"; "…_pro" -> "Claude Pro".
+    static func planLabel(_ raw: String) -> String {
+        var s = raw.replacingOccurrences(of: "default_", with: "")
+                   .replacingOccurrences(of: "claude_", with: "")
+        if s.hasPrefix("max_") {
+            s = s.replacingOccurrences(of: "max_", with: "")
+            return "Claude Max \(s)"          // "5x"
+        }
+        return "Claude " + s.replacingOccurrences(of: "_", with: " ").capitalized
+    }
 }
 
 /// Ring colour thresholds for a usage fraction (0…1 consumed).

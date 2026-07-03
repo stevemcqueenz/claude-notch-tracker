@@ -12,7 +12,7 @@ struct IslandView: View {
     private let wing: CGFloat = 56
     private let iconSize: CGFloat = 18
     private let edgeInset: CGFloat = 12   // keeps content off the pill's flared edges
-    private let dropHeight: CGFloat = 176
+    private let dropHeight: CGFloat = 206
 
     private var expanded: Bool { model.isExpanded }
     private var closedH: CGFloat { max(topInset, 30) }
@@ -71,6 +71,12 @@ struct IslandView: View {
 
     private var dropDown: some View {
         VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "bolt.fill").font(.system(size: 10)).foregroundStyle(.white.opacity(0.6))
+                Text(model.planName ?? "Claude")
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(.white.opacity(0.9))
+                Spacer()
+            }
             usageBlock("clock", "5-Hour Session", model.sessionUsage, resets: model.sessionResetsAt)
             usageBlock("calendar", "7-Day Weekly", model.weeklyUsage, resets: model.weeklyResetsAt)
 
