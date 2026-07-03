@@ -90,10 +90,10 @@ struct IslandView: View {
             LazyVGrid(columns: [.init(.flexible(), spacing: 8), .init(.flexible(), spacing: 8)], spacing: 8) {
                 limitTile("5-Hour", model.sessionUsage, resets: model.sessionResetsAt)
                 limitTile("7-Day", model.weeklyUsage, resets: model.weeklyResetsAt)
-                tile("credits", model.limits?.creditsPct.map { Fmt.pct($0) + " used" } ?? "none")
-                tile("cost today", s.isEmpty ? "—" : Fmt.usd(s.costToday))
-                tile("tokens today", s.isEmpty ? "—" : Fmt.tokens(s.tokensToday))
-                tile("plan", shortPlan)
+                tile("credits", model.limits?.creditsPct.map { Fmt.pct($0) + " used" } ?? "none", height: .compact)
+                tile("cost today", s.isEmpty ? "—" : Fmt.usd(s.costToday), height: .compact)
+                tile("tokens today", s.isEmpty ? "—" : Fmt.tokens(s.tokensToday), height: .tall)
+                tile("plan", shortPlan, height: .tall)
             }
             HStack {
                 Text(model.lastFetch.map { "Updated \(Fmt.ago($0)) ago" } ?? "token estimate")
@@ -121,19 +121,27 @@ struct IslandView: View {
         }
     }
 
+    enum TileHeight { case compact, tall
+        var minHeight: CGFloat { self == .compact ? 34 : 54 }
+        var valueSize: CGFloat { self == .compact ? 13 : 17 }
+    }
+
     // A plain value tile.
-    private func tile(_ label: String, _ value: String) -> some View {
-        tileBox {
+    private func tile(_ label: String, _ value: String, height: TileHeight) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
             Text(label).font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
-            Text(value).font(.system(size: 15, weight: .medium)).monospacedDigit()
+            Text(value).font(.system(size: height.valueSize, weight: .medium)).monospacedDigit()
                 .foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.7)
-            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, minHeight: height.minHeight, alignment: .topLeading)
+        .padding(.horizontal, 10).padding(.vertical, 7)
+        .background(Color.white.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     private func tileBox<C: View>(@ViewBuilder _ content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 2, content: content)
-            .frame(maxWidth: .infinity, minHeight: 48, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 54, alignment: .topLeading)
             .padding(.horizontal, 10).padding(.vertical, 8)
             .background(Color.white.opacity(0.06))
             .clipShape(RoundedRectangle(cornerRadius: 10))
