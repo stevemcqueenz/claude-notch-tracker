@@ -7,6 +7,12 @@ Desktop, live in the notch.
 > Collapsed, it's just Clawd + your session % beside the camera. Click it and the
 > island glides open into a tile grid; click away and it glides shut.
 
+## Demo
+
+<video src="https://github.com/stevemcqueenz/claude-notch-tracker/raw/main/docs/demo.mp4" poster="https://github.com/stevemcqueenz/claude-notch-tracker/raw/main/docs/demo-poster.png" controls muted width="720"></video>
+
+_If the player doesn't load, [watch the demo](docs/demo.mp4)._
+
 ## Features
 
 - **Live usage** straight from claude.ai — 5-hour session, 7-day weekly, and extra
