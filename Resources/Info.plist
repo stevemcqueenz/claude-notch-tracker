@@ -9,9 +9,9 @@
 	<key>CFBundleIdentifier</key>
 	<string>com.claudenotch.app</string>
 	<key>CFBundleVersion</key>
-	<string>0.1.0</string>
+	<string>0.1.1</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>0.1.1</string>
 	<key>CFBundleExecutable</key>
 	<string>ClaudeNotch</string>
 	<key>CFBundlePackageType</key>
