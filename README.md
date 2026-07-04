@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🦀 Claude Notch
+# 🦀 Claude Notch Usage Companion
 
 **A Dynamic Island for your Mac's notch — live Claude usage, with Clawd the crab.**
 
