@@ -14,7 +14,9 @@ enum AvatarFrames {
 struct AvatarView: View {
     var style: AvatarStyle
     var active: Bool
-    private let fps = 10.0
+    var urgency: Double = 0                                       // 0…1 → walk speed
+
+    private var fps: Double { 8 + min(1, max(0, urgency)) * 10 }  // calm 8fps → frantic 18fps
 
     private var clay: Color { Color(red: 0.85, green: 0.47, blue: 0.34) }
 

@@ -24,6 +24,9 @@ struct IslandView: View {
     let notchWidth: CGFloat
     let topInset: CGFloat
 
+    /// 5-Hour tile: false = show burn-rate ETA when available, true = always show reset.
+    @State private var prefReset = false
+
     private let wing: CGFloat = 56
     private let iconSize: CGFloat = 18
     private let edgeInset: CGFloat = 12   // keeps content off the pill's flared edges
@@ -59,6 +62,12 @@ struct IslandView: View {
 
     // Right-click menu (replaces the menu-bar item).
     @ViewBuilder private var menu: some View {
+        if let u = model.updateAvailable {
+            Button("⬆ Update available: v\(u)") {
+                if let url = URL(string: UpdateChecker.releasesURL) { NSWorkspace.shared.open(url) }
+            }
+            Divider()
+        }
         Menu("Icon") {
             ForEach(AvatarStyle.allCases) { style in
                 Button {
@@ -85,7 +94,8 @@ struct IslandView: View {
 
     private var notchRow: some View {
         HStack(spacing: 0) {
-            AvatarView(style: model.avatarStyle, active: model.animateIcon && !model.isPaused)
+            AvatarView(style: model.avatarStyle, active: model.animateIcon && !model.isPaused,
+                       urgency: model.iconUrgency)
                 .frame(width: iconSize, height: iconSize)
                 .frame(width: wing, height: closedH)
                 .onTapGesture { model.cycleAvatar() }
@@ -114,7 +124,11 @@ struct IslandView: View {
         let s = model.snapshot
         return VStack(spacing: 8) {
             LazyVGrid(columns: [.init(.flexible(), spacing: 8), .init(.flexible(), spacing: 8)], spacing: 8) {
-                limitTile("5-Hour", model.sessionUsage, resets: model.sessionResetsAt)
+                limitTile("5-Hour", model.sessionUsage, resets: model.sessionResetsAt,
+                          eta: prefReset ? nil : model.etaToLimit)
+                    .contentShape(Rectangle())
+                    .onTapGesture { if model.etaToLimit != nil { prefReset.toggle() } }
+                    .help(model.etaToLimit != nil ? "Click to switch reset / burn-rate" : "")
                 limitTile("7-Day", model.weeklyUsage, resets: model.weeklyResetsAt)
                 tile("credits", model.limits?.creditsPct.map { Fmt.pct($0) + " used" } ?? "none", height: .compact)
                 tile("cost today", s.isEmpty ? "—" : Fmt.usd(s.costToday), height: .compact)
@@ -122,6 +136,7 @@ struct IslandView: View {
                 tile("plan", shortPlan, height: .compact)
             }
             .opacity(model.isStale ? 0.55 : 1)         // dim live limits when not fresh
+
             HStack {
                 Text(model.lastFetch.map { "Updated \(Fmt.ago($0)) ago" + (model.isStale ? " · reconnecting" : "") }
                      ?? "token estimate")
@@ -140,14 +155,21 @@ struct IslandView: View {
     }
 
     // A limit tile: label, big colour-coded %, and a "resets in …" subline.
-    private func limitTile(_ label: String, _ value: Double?, resets: Date?) -> some View {
+    private func limitTile(_ label: String, _ value: Double?, resets: Date?,
+                           eta: TimeInterval? = nil) -> some View {
         tileBox {
             Text(label).font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
             Text(value.map(Fmt.pct) ?? "—")
                 .font(.system(size: 16, weight: .semibold)).monospacedDigit()
                 .foregroundStyle(barColor(value ?? 0))
-            Text(resets.map { "resets in \(Fmt.until($0))" } ?? "resets —")
-                .font(.system(size: 9.5)).foregroundStyle(.white.opacity(0.45)).lineLimit(1)
+            if let eta {
+                Text("~\(Fmt.dur(eta)) to limit")
+                    .font(.system(size: 9.5, weight: .medium)).lineLimit(1)
+                    .foregroundStyle(Color(red: 0.96, green: 0.70, blue: 0.20))
+            } else {
+                Text(resets.map { "resets in \(Fmt.until($0))" } ?? "resets —")
+                    .font(.system(size: 9.5)).foregroundStyle(.white.opacity(0.45)).lineLimit(1)
+            }
         }
     }
 

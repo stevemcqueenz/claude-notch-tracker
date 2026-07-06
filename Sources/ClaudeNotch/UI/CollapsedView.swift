@@ -14,6 +14,11 @@ enum Fmt {
         let d = s / 86_400, h = (s % 86_400) / 3600, m = (s % 3600) / 60
         return d > 0 ? "\(d)d \(h)h" : "\(h)h \(String(format: "%02d", m))m"
     }
+    /// "35m" / "1h 05m" — a duration.
+    static func dur(_ t: TimeInterval) -> String {
+        let m = max(0, Int(t) / 60)
+        return m >= 60 ? "\(m / 60)h \(String(format: "%02d", m % 60))m" : "\(m)m"
+    }
     /// "4s" / "2m" / "1h" — compact age of a timestamp.
     static func ago(_ date: Date) -> String {
         let s = max(0, Int(-date.timeIntervalSinceNow))
