@@ -1,0 +1,15 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Claude Notch</title>
+        <item>
+            <title>0.1.5</title>
+            <pubDate>Mon, 06 Jul 2026 10:59:24 +0200</pubDate>
+            <sparkle:version>0.1.5</sparkle:version>
+            <sparkle:shortVersionString>0.1.5</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/stevemcqueenz/claude-notch-tracker/releases/download/v0.1.5/ClaudeNotch.zip" length="1430574" type="application/octet-stream" sparkle:edSignature="RZhKzj/sZy2VwzXou/Y4xjjvVxmv4/Vs5J6YyUubdEjQ2fDC6Vb1xUY5x0zF4vva1WaqZHm/Gpbybt6cJYEjCw=="/>
+        </item>
+    </channel>
+</rss>
