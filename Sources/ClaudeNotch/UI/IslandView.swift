@@ -73,6 +73,7 @@ struct IslandView: View {
             }
         }
         Button(model.isPaused ? "Resume tracking" : "Pause tracking") { model.togglePause() }
+        Button((model.animateIcon ? "✓ " : "") + "Animate icon") { model.toggleAnimateIcon() }
         Button((LoginItem.isEnabled ? "✓ " : "") + "Launch at Login") { LoginItem.toggle() }
         Divider()
         Button("Claude Notch v\(AppInfo.version) — \(AppInfo.tagline)") {}.disabled(true)
@@ -84,7 +85,7 @@ struct IslandView: View {
 
     private var notchRow: some View {
         HStack(spacing: 0) {
-            AvatarView(style: model.avatarStyle, active: !model.isPaused)
+            AvatarView(style: model.avatarStyle, active: model.animateIcon && !model.isPaused)
                 .frame(width: iconSize, height: iconSize)
                 .frame(width: wing, height: closedH)
                 .onTapGesture { model.cycleAvatar() }

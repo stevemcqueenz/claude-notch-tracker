@@ -8,6 +8,8 @@ final class AppModel {
     var isPaused = false
     var claudeRunning = false
     var avatarStyle: AvatarStyle = AvatarStyle.selected
+    /// Whether the icon (Clawd / Spark) animates. Persisted; default on.
+    var animateIcon: Bool = (UserDefaults.standard.object(forKey: "animateIcon") as? Bool) ?? true
 
     /// Live account limits from claude.ai (authoritative, matches Claude Desktop).
     private(set) var limits: ClaudeLimits?
@@ -71,6 +73,10 @@ final class AppModel {
     func togglePause() { isPaused.toggle(); if !isPaused { refresh() } }
     func cycleAvatar() { setAvatar(avatarStyle.next) }
     func setAvatar(_ s: AvatarStyle) { avatarStyle = s; AvatarStyle.selected = s }
+    func toggleAnimateIcon() {
+        animateIcon.toggle()
+        UserDefaults.standard.set(animateIcon, forKey: "animateIcon")
+    }
 
     /// Fetch live claude.ai limits off-main (Keychain prompt appears on first run).
     /// Only replaces the last-known-good limits with a response that actually carries a
