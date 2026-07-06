@@ -32,17 +32,30 @@ BIN="$ROOT/.build/release/ClaudeNotch"
 [ -x "$BIN" ] || { echo "✗ binary not found at $BIN"; exit 1; }
 
 echo "▸ Assembling $APP_NAME.app…"
-rm -rf "$DIST"; mkdir -p "$APPDIR/Contents/MacOS" "$APPDIR/Contents/Resources"
+rm -rf "$DIST"
+mkdir -p "$APPDIR/Contents/MacOS" "$APPDIR/Contents/Resources" "$APPDIR/Contents/Frameworks"
 cp "$BIN" "$APPDIR/Contents/MacOS/ClaudeNotch"
 cp "$ROOT/Resources/Info.plist" "$APPDIR/Contents/Info.plist"
 cp "$ROOT/Resources/AppIcon.icns" "$APPDIR/Contents/Resources/AppIcon.icns"
 
+# Embed Sparkle.framework (SwiftPM builds it as an xcframework) + let the binary find it.
+SPARKLE_FW="$(find "$ROOT/.build/artifacts" -path "*macos-arm64_x86_64/Sparkle.framework" -type d 2>/dev/null | head -1)"
+[ -d "$SPARKLE_FW" ] || { echo "✗ Sparkle.framework not found — run 'swift build' first"; exit 1; }
+ditto "$SPARKLE_FW" "$APPDIR/Contents/Frameworks/Sparkle.framework"
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$APPDIR/Contents/MacOS/ClaudeNotch" 2>/dev/null || true
+
 echo "▸ Signing as: $SIGN_ID"
-# No --deep (Quinn: "considered harmful"): the bundle has no nested code, just the
-# main executable, so signing the bundle is sufficient and correct.
+FW="$APPDIR/Contents/Frameworks/Sparkle.framework"
 if [ "$SIGN_ID" = "-" ]; then
+  codesign --force --sign - "$FW"
   codesign --force --sign - "$APPDIR"
 else
+  # Sign Sparkle inside-out (no --deep), then the app last.
+  codesign -f -o runtime --timestamp -s "$SIGN_ID" "$FW/Versions/B/XPCServices/Installer.xpc"
+  codesign -f -o runtime --timestamp -s "$SIGN_ID" --preserve-metadata=entitlements "$FW/Versions/B/XPCServices/Downloader.xpc"
+  codesign -f -o runtime --timestamp -s "$SIGN_ID" "$FW/Versions/B/Autoupdate"
+  codesign -f -o runtime --timestamp -s "$SIGN_ID" "$FW/Versions/B/Updater.app"
+  codesign -f -o runtime --timestamp -s "$SIGN_ID" "$FW"
   codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$APPDIR"
   codesign --verify --strict --verbose=2 "$APPDIR"
 fi
@@ -58,7 +71,7 @@ if [ -n "$NOTARY_PROFILE" ] && [ "$SIGN_ID" != "-" ]; then
 fi
 
 echo "▸ Zipping (ditto, signature-safe)…"
-ditto -c -k --sequesterRsrc --keepParent "$APPDIR" "$DIST/$APP_NAME.zip"
+ditto -c -k --sequesterRsrc --keepParent "$APPDIR" "$DIST/ClaudeNotch.zip"
 
 echo "✓ Done:"
 echo "   app: $APPDIR"

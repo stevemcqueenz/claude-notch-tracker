@@ -38,35 +38,32 @@ final class IslandWindow {
     private let panel: NotchPanel
     private let hosting: PassthroughHostingView<IslandRootView>
     private let model: AppModel
-    private let notchWidth: CGFloat
-    private let topInset: CGFloat
     private let panelHeight: CGFloat = 260
 
-    init(model: AppModel, notchWidth: CGFloat, topInset: CGFloat) {
+    init(model: AppModel) {
         self.model = model
-        self.notchWidth = notchWidth
-        self.topInset = topInset
+        hosting = PassthroughHostingView(rootView: IslandRootView(model: model))
+        panel = NotchPanel(contentRect: NSRect(x: 0, y: 0, width: 400, height: panelHeight))
+        panel.contentView = hosting
+    }
 
-        let screen = NSScreen.main ?? NSScreen.screens.first!
+    /// Position the full-width strip on the notched screen (or main), flush to its top.
+    /// Called on launch and whenever the display configuration changes.
+    func relayout() {
+        guard let screen = NSScreen.island else { return }
         let frame = NSRect(x: screen.frame.minX, y: screen.frame.maxY - panelHeight,
                            width: screen.frame.width, height: panelHeight)
-
-        hosting = PassthroughHostingView(
-            rootView: IslandRootView(model: model, notchWidth: notchWidth, topInset: topInset))
-        hosting.frame = NSRect(origin: .zero, size: frame.size)
-
-        panel = NotchPanel(contentRect: frame)
-        panel.contentView = hosting
         panel.setFrame(frame, display: true)
+        hosting.frame = NSRect(origin: .zero, size: frame.size)
         updateInteractiveZone()
     }
 
     /// Resize only the invisible click-catcher to the pill's current footprint — cheap, no
     /// window resize, so no animation jump.
     func updateInteractiveZone() {
-        let closedH = max(topInset, 30)
+        let closedH = max(model.topInset, 30)
         let dropH: CGFloat = 198
-        let zoneW = notchWidth + 56 * 2 + 24 + 24          // wing+gap+wing + edge insets + margin
+        let zoneW = model.notchWidth + 56 * 2 + 24 + 24    // wing+gap+wing + edge insets + margin
         let zoneH = (model.isExpanded ? closedH + dropH + 8 : closedH + 6)
         let w = hosting.bounds.width
         let h = hosting.bounds.height

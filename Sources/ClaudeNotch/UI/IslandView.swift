@@ -4,12 +4,10 @@ import AppKit
 /// Top-anchors the pill inside the fixed full-width window, horizontally centered on the notch.
 struct IslandRootView: View {
     let model: AppModel
-    let notchWidth: CGFloat
-    let topInset: CGFloat
 
     var body: some View {
         VStack(spacing: 0) {
-            IslandView(model: model, notchWidth: notchWidth, topInset: topInset)
+            IslandView(model: model, notchWidth: model.notchWidth, topInset: model.topInset)
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -62,12 +60,6 @@ struct IslandView: View {
 
     // Right-click menu (replaces the menu-bar item).
     @ViewBuilder private var menu: some View {
-        if let u = model.updateAvailable {
-            Button("⬆ Update available: v\(u)") {
-                if let url = URL(string: UpdateChecker.releasesURL) { NSWorkspace.shared.open(url) }
-            }
-            Divider()
-        }
         Menu("Icon") {
             ForEach(AvatarStyle.allCases) { style in
                 Button {
@@ -84,6 +76,8 @@ struct IslandView: View {
         Button(model.isPaused ? "Resume tracking" : "Pause tracking") { model.togglePause() }
         Button((model.animateIcon ? "✓ " : "") + "Animate icon") { model.toggleAnimateIcon() }
         Button((LoginItem.isEnabled ? "✓ " : "") + "Launch at Login") { LoginItem.toggle() }
+        Divider()
+        Button("Check for Updates…") { Updater.shared.checkForUpdates() }
         Divider()
         Button("Claude Notch v\(AppInfo.version) — \(AppInfo.tagline)") {}.disabled(true)
         Divider()

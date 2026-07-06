@@ -21,14 +21,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ note: Notification) {
         model.start()
-        monitor.start { [weak self] in self?.sync() }   // computes notch geometry first
-
-        let notchW = monitor.notchWidth > 0 ? monitor.notchWidth : 190   // synthetic on non-notch
-        let topInset = monitor.notchHeight > 0 ? monitor.notchHeight : 32
-        window = IslandWindow(model: model, notchWidth: notchW, topInset: topInset)
-
+        Updater.shared.start()                          // Sparkle auto-updates
+        window = IslandWindow(model: model)
+        monitor.start { [weak self] in self?.sync() }   // fires on display / Claude changes
         observeExpansion()
         sync()
+        window.show()
+    }
+
+    /// Push current notch geometry into the model and reposition the island to the notched
+    /// screen. Runs on launch and on every display-configuration change.
+    private func sync() {
+        guard let window else { return }   // monitor.start() can fire before window exists
+        model.notchWidth = monitor.notchWidth > 0 ? monitor.notchWidth : 190   // synthetic on non-notch
+        model.topInset = monitor.notchHeight > 0 ? monitor.notchHeight : 32
+        window.relayout()
+        window.show()
     }
 
     /// withObservationTracking fires once, so re-arm after each change to keep tracking
@@ -58,12 +66,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSEvent.removeMonitor(m)
             clickMonitor = nil
         }
-    }
-
-    private func sync() {
-        // monitor.start() fires this callback during start(), before `window` exists.
-        guard let window else { return }
-        window.updateInteractiveZone()
-        window.show()   // always visible; data works off the on-disk session regardless
     }
 }

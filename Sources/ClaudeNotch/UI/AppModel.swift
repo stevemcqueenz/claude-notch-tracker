@@ -10,6 +10,9 @@ final class AppModel {
     var avatarStyle: AvatarStyle = AvatarStyle.selected
     /// Whether the icon (Clawd / Spark) animates. Persisted; default on.
     var animateIcon: Bool = (UserDefaults.standard.object(forKey: "animateIcon") as? Bool) ?? true
+    /// Notch geometry of the screen the island lives on (updated on display changes).
+    var notchWidth: CGFloat = 190
+    var topInset: CGFloat = 32
 
     /// Live account limits from claude.ai (authoritative, matches Claude Desktop).
     private(set) var limits: ClaudeLimits?
@@ -21,8 +24,6 @@ final class AppModel {
     private var weeklyResetFromConfig: Date?
     /// Recent (time, session %) samples for the burn-rate ETA.
     private var pctHistory: [(t: Date, pct: Double)] = []
-    /// A newer release version if one exists (surfaced in the right-click menu).
-    private(set) var updateAvailable: String?
 
     private let store = UsageStore()
     private let loader = LogLoader()
@@ -89,11 +90,6 @@ final class AppModel {
         }
         Task { await ingest(ClaudePaths.recentLogFiles(within: 2)) }
         fetchLimits()
-        checkForUpdate()
-    }
-
-    func checkForUpdate() {
-        Task { self.updateAvailable = await UpdateChecker.latestIfNewer(than: AppInfo.version) }
     }
 
     func togglePause() { isPaused.toggle(); if !isPaused { refresh() } }

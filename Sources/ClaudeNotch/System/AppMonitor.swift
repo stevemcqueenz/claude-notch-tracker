@@ -1,5 +1,12 @@
 import AppKit
 
+extension NSScreen {
+    /// The screen the island should live on: a notched one if present, else the main screen.
+    static var island: NSScreen? {
+        screens.first(where: { $0.safeAreaInsets.top > 0 }) ?? main ?? screens.first
+    }
+}
+
 @MainActor @Observable
 final class AppMonitor {
     var claudeRunning = false
@@ -39,7 +46,7 @@ final class AppMonitor {
     }
 
     private func updateNotch() {
-        guard let screen = NSScreen.main else { return }
+        guard let screen = NSScreen.island else { return }
         notchHeight = screen.safeAreaInsets.top
         if screen.safeAreaInsets.top > 0, let left = screen.auxiliaryTopLeftArea,
            let right = screen.auxiliaryTopRightArea {
