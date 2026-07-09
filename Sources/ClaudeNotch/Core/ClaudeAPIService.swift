@@ -34,7 +34,9 @@ actor ClaudeAPIService {
                 return limits
             }
         }
-        return nil
+        // Terminal-only fallback: the Claude Code CLI's own OAuth token, so users with neither
+        // Claude Desktop nor a logged-in browser still get real numbers.
+        return await fetchFromCLIToken()
     }
 
     /// Candidate session stores, most-likely first. Only those actually present are returned.
@@ -101,11 +103,56 @@ actor ClaudeAPIService {
             return (util.map { min(1, max(0, $0 / 100)) }, reset)
         }
         let (s, sr) = node("five_hour")
-        let (w, wr) = node("seven_day")
+        var (w, wr) = node("seven_day")
+        if w == nil {   // /api/oauth/usage splits the 7-day limit by model
+            let (wo, wor) = node("seven_day_opus")
+            let (ws, wsr) = node("seven_day_sonnet")
+            w = [wo, ws].compactMap { $0 }.max()
+            wr = wor ?? wsr
+        }
         let (c, _) = node("extra_usage")
         return ClaudeLimits(sessionPct: s, sessionResetsAt: sr,
                             weeklyPct: w, weeklyResetsAt: wr,
                             creditsPct: c, source: source, fetchedAt: Date())
+    }
+
+    // MARK: - Claude Code CLI (OAuth token in the Keychain)
+
+    /// Fetch usage with the Claude Code CLI's own OAuth token — the same call the CLI makes for
+    /// `/usage`. Read-only: we use the token only while it is still valid and never refresh it, so
+    /// the CLI's own login is never disturbed (an expired token just falls through to nil).
+    private func fetchFromCLIToken() async -> ClaudeLimits? {
+        guard let (token, expiresAt) = cliOAuthToken(), expiresAt > Date(),
+              let url = URL(string: "https://api.anthropic.com/api/oauth/usage") else { return nil }
+        var req = URLRequest(url: url, timeoutInterval: 15)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        guard let (data, resp) = try? await URLSession.shared.data(for: req),
+              (resp as? HTTPURLResponse)?.statusCode == 200,
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+        return parse(obj, source: "Claude Code")
+    }
+
+    /// The Claude Code CLI stores its OAuth credentials as JSON in the login Keychain under the
+    /// service "Claude Code-credentials". Returns the access token and its expiry, if present.
+    private func cliOAuthToken() -> (token: String, expiresAt: Date)? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "Claude Code-credentials",
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+              let data = item as? Data,
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let oauth = root["claudeAiOauth"] as? [String: Any],
+              let token = oauth["accessToken"] as? String, !token.isEmpty else { return nil }
+        // expiresAt is epoch milliseconds; a missing value reads as already-expired (→ ignored).
+        let expMs = (oauth["expiresAt"] as? NSNumber)?.doubleValue ?? 0
+        return (token, Date(timeIntervalSince1970: expMs / 1000))
     }
 
     // MARK: - cookie stores

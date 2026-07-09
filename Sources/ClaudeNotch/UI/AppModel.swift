@@ -31,6 +31,10 @@ final class AppModel {
     private var watcher: LogWatcher?
     private var ticker: Timer?
     private var limitsTimer: Timer?
+    /// mtime of each log file the last time we parsed it, so the periodic sweep re-reads only
+    /// files that actually grew and skips the rest.
+    private var parsedMTimes: [URL: Date] = [:]
+    private var lastReingest = Date.distantPast
 
     // MARK: display values (prefer live limits, then terminal feed, then estimate)
 
@@ -83,7 +87,7 @@ final class AppModel {
         }
         watcher?.start()
         ticker = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refresh() }
+            Task { @MainActor in self?.tick() }
         }
         limitsTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.fetchLimits() }
@@ -126,7 +130,32 @@ final class AppModel {
     private func ingest(_ files: [URL]) async {
         let parsed = await loader.parse(files)
         for item in parsed { store.ingest(fileURL: item.url, events: item.events) }
+        for url in files { parsedMTimes[url] = Self.mtime(url) }
         refresh()
+    }
+
+    /// Fires every 5s: re-read any grown log files (freshness safety net that doesn't depend on
+    /// the FSEvents watcher), then recompute the snapshot.
+    private func tick() {
+        reingestChangedFiles()
+        refresh()
+    }
+
+    /// Re-parse recent log files whose mtime advanced since we last read them. This makes local
+    /// token/cost stay fresh even if the FSEvents watcher misses an append (e.g. after a launch
+    /// with no prior same-day activity). Throttled and mtime-gated so unchanged files are skipped.
+    private func reingestChangedFiles() {
+        guard !isPaused, Date().timeIntervalSince(lastReingest) >= 10 else { return }
+        let changed = ClaudePaths.recentLogFiles(within: 2)
+            .filter { Self.mtime($0) > (parsedMTimes[$0] ?? .distantPast) }
+        guard !changed.isEmpty else { return }
+        lastReingest = Date()
+        Task { await ingest(changed) }
+    }
+
+    private static func mtime(_ url: URL) -> Date {
+        (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+            .contentModificationDate ?? .distantPast
     }
 
     func refresh() {
