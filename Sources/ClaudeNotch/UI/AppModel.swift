@@ -75,6 +75,10 @@ final class AppModel {
     /// How urgent the icon should look (0…1) — drives Clawd's walk speed.
     var iconUrgency: Double { max(sessionUsage ?? 0, limits?.weeklyPct ?? 0) }
 
+    /// A limit (5-hour or 7-day) is used up — there's nothing left to spend, so Clawd stops
+    /// walking and stands still rather than sprinting at max speed.
+    var isAtLimit: Bool { iconUrgency >= 0.999 }
+
     private var home: URL { FileManager.default.homeDirectoryForCurrentUser }
     private var usageFileURL: URL { home.appendingPathComponent(".claude/notch-usage.json") }
     private var configURL: URL { home.appendingPathComponent(".claude.json") }

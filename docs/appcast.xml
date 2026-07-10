@@ -3,6 +3,15 @@
     <channel>
         <title>Claude Notch</title>
         <item>
+            <title>0.1.7</title>
+            <pubDate>Fri, 10 Jul 2026 08:39:34 +0200</pubDate>
+            <sparkle:version>0.1.7</sparkle:version>
+            <sparkle:shortVersionString>0.1.7</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/stevemcqueenz/claude-notch-tracker/releases/download/v0.1.7/ClaudeNotch.zip" length="1441250" type="application/octet-stream" sparkle:edSignature="sEHMcK9p5faxxtGGDleMCyOc/QOlSND0GMgS/8TzkiS+1yR/FQ1s6dG7GFQrgoyNbz9zEJHew3II28MZrBvMBQ=="/>
+        </item>
+        <item>
             <title>0.1.6</title>
             <pubDate>Thu, 09 Jul 2026 22:11:47 +0200</pubDate>
             <sparkle:version>0.1.6</sparkle:version>

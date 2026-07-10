@@ -88,7 +88,7 @@ struct IslandView: View {
 
     private var notchRow: some View {
         HStack(spacing: 0) {
-            AvatarView(style: model.avatarStyle, active: model.animateIcon && !model.isPaused,
+            AvatarView(style: model.avatarStyle, active: model.animateIcon && !model.isPaused && !model.isAtLimit,
                        urgency: model.iconUrgency)
                 .frame(width: iconSize, height: iconSize)
                 .frame(width: wing, height: closedH)
