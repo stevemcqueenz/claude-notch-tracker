@@ -32,32 +32,39 @@ island glides open into a tile grid, click away and it glides shut.
 
 ## Features
 
-- **Live usage** straight from claude.ai — 5-hour session, 7-day weekly, and extra
-  credits, each with a reset countdown. Matches Claude Desktop exactly.
+- **Live usage** — 5-hour session, 7-day weekly, and extra credits, each with a reset
+  countdown. Matches Claude Desktop exactly.
+- **Any Claude login works** — Claude Desktop, a browser signed into claude.ai, or the
+  **Claude Code CLI** (even terminal-only, with no desktop app or browser installed).
 - **At-a-glance** session % + colour ring (white → amber → red) in the notch.
 - **Tile grid** on click: 5-Hour, 7-Day, credits, cost today, tokens today, and your
   plan (e.g. Claude Max 5x).
-- **Cost + tokens today** computed locally from your `~/.claude` logs.
-- **Clawd**, the walking crab — or a mono variant, or the Claude Spark. Click to swap.
+- **Cost + tokens today** computed locally from your `~/.claude` logs, kept live.
+- **Clawd**, the walking crab — he quickens as you near your limit and freezes when
+  you're out. Prefer a mono crab or the Claude Spark? Click to swap.
 - **No menu-bar clutter** — everything's on a right-click; the island is the whole UI.
 - **Smooth morph** animation (a real notch-shaped window, not a resizing rectangle).
 - Draws its **own notch** on non-notch Macs.
 
 ## How it works
 
-Claude Notch reads *your own* local Claude session — from **Claude Desktop** or a
-**browser signed into claude.ai** (Chrome, Brave, Edge, Arc, Firefox, Zen) — and calls
-the same `claude.ai` usage endpoint the apps use. Nothing leaves your machine; it talks
-only to `claude.ai`, with your own session. No analytics, no third-party servers.
+Claude Notch reads *your own* local Claude session — from **Claude Desktop**, a
+**browser signed into claude.ai** (Chrome, Brave, Edge, Arc, Firefox, Zen), or the
+**Claude Code CLI** — and calls the same usage endpoint the official apps use. Nothing
+leaves your machine; it talks only to Anthropic, with your own session. No analytics, no
+third-party servers.
 
-The session cookie is read from the browser/app's local cookie store (Chromium's is
-decrypted with the OS Keychain "Safe Storage" key, the same mechanism the browsers use);
-macOS asks your permission via a Keychain prompt on first run.
+For Desktop and browsers, the session cookie is read from the local cookie store
+(Chromium's is decrypted with the OS Keychain "Safe Storage" key, the same mechanism the
+browsers use). For the terminal, it reuses the Claude Code CLI's own login token from the
+Keychain — **read-only, and never refreshed, so your CLI session is left untouched**.
+Either way, macOS asks your permission via a Keychain prompt on first run.
 
 ## Requirements
 
 - macOS 14+ (Apple Silicon or Intel)
-- Claude Desktop signed in, **or** a supported browser signed in to claude.ai
+- A signed-in Claude session — **Claude Desktop**, a supported **browser** on claude.ai,
+  or the **Claude Code CLI** (works even with no desktop app or browser)
 
 ## Install
 
@@ -84,7 +91,8 @@ the Command Line Tools.
 
 - **Click** the % / ring → expand; **click away** → collapse.
 - **Click Clawd** → cycle icon (Clawd → mono → Spark).
-- **Right-click** the island → Icon, Pause, Launch at Login, Quit.
+- **Right-click** the island → Icon, Pause, Animate icon, Launch at Login,
+  Check for Updates, Quit.
 
 ## Credits
 
