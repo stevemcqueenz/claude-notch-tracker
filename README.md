@@ -14,6 +14,10 @@
 &nbsp;![macOS 14+](https://img.shields.io/badge/macOS-14+-111111?logo=apple&logoColor=white)
 &nbsp;[![License MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
+<br/><br/>
+
+<a href="https://www.producthunt.com/products/mac-claude-notch-usage-tracker?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-mac-claude-notch-usage-companion" target="_blank" rel="noopener noreferrer"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1194655&theme=light" alt="[MAC] Claude Notch Usage Companion - Claude live usage in the MacBook notch as a Dynamic Island. | Product Hunt" width="250" height="54" /></a>
+
 </div>
 
 The same **5-hour**, **7-day**, and **credit** numbers you see in Claude Desktop — live in
