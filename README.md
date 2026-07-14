@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🦀 Claude Notch
+# 🦀 Claude Notch Usage Companion
 
 **Your live Claude usage — 5‑hour, 7‑day, Fable, cost — right in your Mac's notch.**
 
