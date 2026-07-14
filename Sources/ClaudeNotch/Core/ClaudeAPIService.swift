@@ -10,6 +10,8 @@ struct ClaudeLimits: Sendable {
     var weeklyPct: Double?       // 0…1 used (seven_day)
     var weeklyResetsAt: Date?
     var creditsPct: Double?      // 0…1 used (extra_usage), nil if no credits
+    var fablePct: Double?        // 0…1 used (Fable's own weekly limit), nil if absent
+    var fableResetsAt: Date?
     var source: String?          // where the session came from (e.g. "Brave")
     var fetchedAt: Date
 }
@@ -111,9 +113,28 @@ actor ClaudeAPIService {
             wr = wor ?? wsr
         }
         let (c, _) = node("extra_usage")
+
+        // Fable has its own weekly limit (the Desktop app shows it) — a "weekly_scoped" entry in the
+        // `limits` array whose scope.model.display_name is "Fable"; its figure is `percent` (0–100).
+        var f: Double?
+        var fr: Date?
+        if let arr = obj["limits"] as? [[String: Any]] {
+            for e in arr {
+                let model = (e["scope"] as? [String: Any])?["model"] as? [String: Any]
+                guard (model?["display_name"] as? String) == "Fable" else { continue }
+                if let p = (e["percent"] as? NSNumber)?.doubleValue { f = min(1, max(0, p / 100)) }
+                if let rs = e["resets_at"] as? String {
+                    let iso = ISO8601DateFormatter(); iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                    fr = iso.date(from: rs) ?? ISO8601DateFormatter().date(from: rs)
+                }
+                break
+            }
+        }
+
         return ClaudeLimits(sessionPct: s, sessionResetsAt: sr,
                             weeklyPct: w, weeklyResetsAt: wr,
-                            creditsPct: c, source: source, fetchedAt: Date())
+                            creditsPct: c, fablePct: f, fableResetsAt: fr,
+                            source: source, fetchedAt: Date())
     }
 
     // MARK: - Claude Code CLI (OAuth token in the Keychain)

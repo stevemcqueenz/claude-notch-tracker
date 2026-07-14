@@ -45,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func observeExpansion() {
         withObservationTracking {
             _ = model.isExpanded
+            _ = model.expandedDropHeight   // re-sync the click-zone when the session count changes
         } onChange: { [weak self] in
             Task { @MainActor in
                 guard let self else { return }

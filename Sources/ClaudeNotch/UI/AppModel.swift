@@ -4,6 +4,8 @@ import SwiftUI
 @MainActor @Observable
 final class AppModel {
     private(set) var snapshot: UsageSnapshot = .empty
+    /// Projects worked in today with their spend (from the logs), most-recently-active first.
+    var sessionsToday: [ProjectUsage] { snapshot.projectsToday }
     var isExpanded = false
     var isPaused = false
     var claudeRunning = false
@@ -25,15 +27,24 @@ final class AppModel {
     /// Recent (time, session %) samples for the burn-rate ETA.
     private var pctHistory: [(t: Date, pct: Double)] = []
 
+    /// Lifetime tokens + cost across every log (scanned off-main, refreshed periodically).
+    private(set) var lifetime: LifetimeScanner.Totals = .init()
+
     private let store = UsageStore()
     private let loader = LogLoader()
     private let claudeAPI = ClaudeAPIService()
+    private let lifetimeScanner = LifetimeScanner()
     private var watcher: LogWatcher?
     private var ticker: Timer?
     private var limitsTimer: Timer?
+    private var lifetimeTimer: Timer?
     /// mtime of each log file the last time we parsed it, so the periodic sweep re-reads only
     /// files that actually grew and skips the rest.
     private var parsedMTimes: [URL: Date] = [:]
+    /// Byte offset consumed so far per file, so we tail-parse only newly-appended bytes.
+    private var parsedOffsets: [URL: UInt64] = [:]
+    /// Conversation titles (sessionId → sidebar name), accumulated as logs are parsed.
+    private var titlesBySession: [String: String] = [:]
     private var lastReingest = Date.distantPast
 
     // MARK: display values (prefer live limits, then terminal feed, then estimate)
@@ -42,6 +53,8 @@ final class AppModel {
         limits?.sessionPct ?? statuslineUsage ?? (snapshot.isEmpty ? nil : snapshot.blockUsageEstimate)
     }
     var weeklyUsage: Double? { limits?.weeklyPct }
+    var fableUsage: Double? { limits?.fablePct }          // Fable's own weekly limit (if provided)
+    var fableResetsAt: Date? { limits?.fableResetsAt }
     var sessionResetsAt: Date? { limits?.sessionResetsAt }
     var weeklyResetsAt: Date? { limits?.weeklyResetsAt ?? weeklyResetFromConfig }
     var lastFetch: Date? { limits?.fetchedAt }
@@ -79,6 +92,16 @@ final class AppModel {
     /// walking and stands still rather than sprinting at max speed.
     var isAtLimit: Bool { iconUrgency >= 0.999 }
 
+    /// Projected end-of-day cost if today keeps up its average spend rate so far. nil before any
+    /// spend, or too early in the day for the extrapolation to mean anything.
+    var projectedCostToday: Double? {
+        let cost = snapshot.costToday
+        guard cost > 0 else { return nil }
+        let dayFraction = Date().timeIntervalSince(Calendar.current.startOfDay(for: Date())) / 86_400
+        guard dayFraction > 0.1 else { return nil }   // before ~2:24am it's just noise
+        return cost / dayFraction
+    }
+
     private var home: URL { FileManager.default.homeDirectoryForCurrentUser }
     private var usageFileURL: URL { home.appendingPathComponent(".claude/notch-usage.json") }
     private var configURL: URL { home.appendingPathComponent(".claude.json") }
@@ -98,6 +121,19 @@ final class AppModel {
         }
         Task { await ingest(ClaudePaths.recentLogFiles(within: 2)) }
         fetchLimits()
+        scanLifetime()
+        lifetimeTimer = Timer.scheduledTimer(withTimeInterval: 600, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.scanLifetime() }
+        }
+    }
+
+    /// Total all-time tokens + cost, scanned off-main so the (potentially many-GB) sweep never
+    /// blocks the UI.
+    private func scanLifetime() {
+        Task { [lifetimeScanner] in
+            let totals = await lifetimeScanner.scan()
+            self.lifetime = totals
+        }
     }
 
     func togglePause() { isPaused.toggle(); if !isPaused { refresh() } }
@@ -132,8 +168,15 @@ final class AppModel {
     }
 
     private func ingest(_ files: [URL]) async {
-        let parsed = await loader.parse(files)
-        for item in parsed { store.ingest(fileURL: item.url, events: item.events) }
+        let requests = files.map { (url: $0, offset: parsedOffsets[$0] ?? 0) }
+        let results = await loader.parse(requests)
+        for r in results {
+            // A fresh/full read (first time, or after truncation) replaces; a tail read appends.
+            if r.reset { store.ingest(fileURL: r.url, events: r.events) }
+            else { store.append(fileURL: r.url, events: r.events) }
+            parsedOffsets[r.url] = r.newOffset
+            for (sid, title) in r.titles { titlesBySession[sid] = title }
+        }
         for url in files { parsedMTimes[url] = Self.mtime(url) }
         refresh()
     }
@@ -163,9 +206,13 @@ final class AppModel {
     }
 
     func refresh() {
-        snapshot = store.snapshot(now: Date())
+        snapshot = store.snapshot(now: Date(), titles: titlesBySession)
         readStatusFeed()
     }
+
+    /// Expanded drop-down height — fixed, since the expanded view is a fixed-size two-page pager.
+    /// Read by both the view and the window's click-zone.
+    var expandedDropHeight: CGFloat { 234 }
 
     /// Terminal statusline feed (fallback source for session % and context).
     private func readStatusFeed() {

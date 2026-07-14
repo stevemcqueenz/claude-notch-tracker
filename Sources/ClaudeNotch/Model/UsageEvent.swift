@@ -6,6 +6,8 @@ struct UsageEvent: Equatable, Sendable {
     let requestId: String?
     let messageId: String?
     let model: String
+    /// Working directory the session ran in (from the log), e.g. "/Users/me/claude/wowlab".
+    let cwd: String
     let inputTokens: Int
     let outputTokens: Int
     let cacheCreationTokens: Int

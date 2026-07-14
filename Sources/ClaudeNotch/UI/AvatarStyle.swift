@@ -2,7 +2,7 @@ import SwiftUI
 import ServiceManagement
 
 enum AppInfo {
-    static let version = "0.1.7"
+    static let version = "0.1.8"
     static let tagline = "Made with Claude"
 }
 

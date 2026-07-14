@@ -38,7 +38,7 @@ final class IslandWindow {
     private let panel: NotchPanel
     private let hosting: PassthroughHostingView<IslandRootView>
     private let model: AppModel
-    private let panelHeight: CGFloat = 260
+    private let panelHeight: CGFloat = 300
 
     init(model: AppModel) {
         self.model = model
@@ -62,7 +62,7 @@ final class IslandWindow {
     /// window resize, so no animation jump.
     func updateInteractiveZone() {
         let closedH = max(model.topInset, 30)
-        let dropH: CGFloat = 198
+        let dropH = model.expandedDropHeight
         let zoneW = model.notchWidth + 56 * 2 + 24 + 24    // wing+gap+wing + edge insets + margin
         let zoneH = (model.isExpanded ? closedH + dropH + 8 : closedH + 6)
         let w = hosting.bounds.width
