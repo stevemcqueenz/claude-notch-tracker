@@ -4,7 +4,7 @@
 
 **Your live Claude usage — 5‑hour, 7‑day, Fable, cost — right in your Mac's notch.**
 
-<img src="docs/demo.gif" width="440" alt="Claude Notch — click to expand, swipe between the limits and detail pages, and tap to switch active sessions / all-time" />
+<img src="docs/demo.gif" width="640" alt="Claude Notch — click to expand, swipe between the limits and detail pages, and tap to switch active sessions / all-time" />
 
 [![Latest release](https://img.shields.io/github/v/release/stevemcqueenz/claude-notch-tracker?color=CC785C&label=download)](https://github.com/stevemcqueenz/claude-notch-tracker/releases/latest)
 &nbsp;![macOS 14+](https://img.shields.io/badge/macOS-14+-111111?logo=apple&logoColor=white)
