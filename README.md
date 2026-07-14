@@ -25,12 +25,22 @@ your spend and sessions behind. Click away and it glides shut. No Dock icon, no 
 <table align="center">
 <tr>
 <td align="center" width="50%">
-  <img src="docs/page-sessions.png" width="330" alt="Page 2 — today vs all-time spend and active sessions by conversation name" /><br/>
-  <sub><b>Active sessions</b> — today's spend, per conversation</sub>
+  <img src="docs/page-limits.png" width="340" alt="Limits page — 5-Hour, 7-Day, Fable weekly, and today's cost/tokens" /><br/>
+  <sub><b>Limits</b> — 5‑hour, 7‑day, Fable weekly + today's cost</sub>
 </td>
 <td align="center" width="50%">
-  <img src="docs/page-alltime.png" width="330" alt="Page 2 toggled to all-time — your biggest-spending projects ever" /><br/>
+  <img src="docs/page-sessions.png" width="340" alt="Active sessions — today's spend per conversation" /><br/>
+  <sub><b>Active sessions</b> — today's spend, per conversation</sub>
+</td>
+</tr>
+<tr>
+<td align="center" width="50%">
+  <img src="docs/page-alltime.png" width="340" alt="All-time top projects — biggest-spending projects ever" /><br/>
   <sub><b>All‑time top projects</b> — tap the ⇄ chip to switch</sub>
+</td>
+<td align="center" width="50%">
+  <img src="docs/settings.png" width="340" alt="Right-click settings menu — icon, pause, launch at login, updates" /><br/>
+  <sub><b>Settings</b> — right‑click the island</sub>
 </td>
 </tr>
 </table>
