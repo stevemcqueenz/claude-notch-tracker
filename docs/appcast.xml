@@ -4,6 +4,17 @@
         <title>Claude Notch</title>
         <item>
             <title>0.1.9</title>
+            <description><![CDATA[
+                <h2>Hide in full screen</h2>
+                <p>New right-click menu toggle <b>Hide in full screen</b> (off by default). When it's on, the island tucks up into the notch while a full-screen app owns that display — great for movies and full-screen video — and slides back down when you leave full screen.</p>
+                <ul>
+                    <li>Opt-in, so nothing changes unless you enable it</li>
+                    <li>Reliable on notched Macs, where a full-screen window otherwise looks just like a maximized one</li>
+                    <li>Permission-free detection — no Accessibility prompt</li>
+                    <li>Smooth slide-up / slide-down transition</li>
+                </ul>
+                <p>Resolves issue #2.</p>
+            ]]></description>
             <pubDate>Sun, 19 Jul 2026 00:20:09 +0200</pubDate>
             <sparkle:version>0.1.9</sparkle:version>
             <sparkle:shortVersionString>0.1.9</sparkle:shortVersionString>
