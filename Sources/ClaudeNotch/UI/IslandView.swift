@@ -80,6 +80,7 @@ struct IslandView: View {
         }
         Button(model.isPaused ? "Resume tracking" : "Pause tracking") { model.togglePause() }
         Button((model.animateIcon ? "✓ " : "") + "Animate icon") { model.toggleAnimateIcon() }
+        Button((model.hideInFullscreen ? "✓ " : "") + "Hide in full screen") { model.toggleHideInFullscreen() }
         Button((LoginItem.isEnabled ? "✓ " : "") + "Launch at Login") { LoginItem.toggle() }
         Divider()
         Button("Check for Updates…") { Updater.shared.checkForUpdates() }

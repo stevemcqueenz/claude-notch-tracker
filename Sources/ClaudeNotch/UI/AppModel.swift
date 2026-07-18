@@ -12,6 +12,8 @@ final class AppModel {
     var avatarStyle: AvatarStyle = AvatarStyle.selected
     /// Whether the icon (Clawd / Spark) animates. Persisted; default on.
     var animateIcon: Bool = (UserDefaults.standard.object(forKey: "animateIcon") as? Bool) ?? true
+    /// Hide the island while a fullscreen app is frontmost (menu bar hidden). Persisted; default off.
+    var hideInFullscreen: Bool = UserDefaults.standard.bool(forKey: "hideInFullscreen")
     /// Notch geometry of the screen the island lives on (updated on display changes).
     var notchWidth: CGFloat = 190
     var topInset: CGFloat = 32
@@ -142,6 +144,10 @@ final class AppModel {
     func toggleAnimateIcon() {
         animateIcon.toggle()
         UserDefaults.standard.set(animateIcon, forKey: "animateIcon")
+    }
+    func toggleHideInFullscreen() {
+        hideInFullscreen.toggle()
+        UserDefaults.standard.set(hideInFullscreen, forKey: "hideInFullscreen")
     }
 
     /// Fetch live claude.ai limits off-main (Keychain prompt appears on first run).
