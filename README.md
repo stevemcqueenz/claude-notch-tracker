@@ -2,9 +2,9 @@
 
 # 🦀 Claude Notch Usage Companion
 
-**Your live Claude usage — 5‑hour, 7‑day, Fable, cost — right in your Mac's notch.**
+**Your live Claude usage in your Mac's notch: 5-hour, 7-day, Fable, and cost.**
 
-<img src="docs/demo.gif" width="640" alt="Claude Notch — click to expand, swipe between the limits and detail pages, and tap to switch active sessions / all-time" />
+<img src="docs/demo.gif" width="640" alt="Claude Notch: click to expand, swipe between the limits and detail pages, and tap to switch active sessions or all-time" />
 
 [![Latest release](https://img.shields.io/github/v/release/stevemcqueenz/claude-notch-tracker?color=CC785C&label=download)](https://github.com/stevemcqueenz/claude-notch-tracker/releases/latest)
 &nbsp;![macOS 14+](https://img.shields.io/badge/macOS-14+-111111?logo=apple&logoColor=white)
@@ -17,84 +17,86 @@
 </div>
 
 Collapsed, it's just **Clawd** (the crab) and your session % beside the camera. Click it and the
-island glides open into a two‑page card you can **swipe** through — your real limits up front,
-your spend and sessions behind. Click away and it glides shut. No Dock icon, no menu‑bar clutter.
+island glides open into a two-page card you can **swipe** through. Your real limits sit up front;
+your spend and sessions sit behind. Click away and it glides shut. No Dock icon, no menu-bar clutter.
 
 ## Screenshots
 
 <table align="center">
 <tr>
 <td align="center" width="50%">
-  <img src="docs/page-limits.png" width="340" alt="Limits page — 5-Hour, 7-Day, Fable weekly, and today's cost/tokens" /><br/>
-  <sub><b>Limits</b> — 5‑hour, 7‑day, Fable weekly + today's cost</sub>
+  <img src="docs/page-limits.png" width="340" alt="Limits page: 5-Hour, 7-Day, Fable weekly, and today's cost and tokens" /><br/>
+  <sub><b>Limits</b>: 5-hour, 7-day, Fable weekly, plus today's cost</sub>
 </td>
 <td align="center" width="50%">
-  <img src="docs/page-sessions.png" width="340" alt="Active sessions — today's spend per conversation" /><br/>
-  <sub><b>Active sessions</b> — today's spend, per conversation</sub>
+  <img src="docs/page-sessions.png" width="340" alt="Active sessions: today's spend per conversation" /><br/>
+  <sub><b>Active sessions</b>: today's spend, per conversation</sub>
 </td>
 </tr>
 <tr>
 <td align="center" width="50%">
-  <img src="docs/page-alltime.png" width="340" alt="All-time top projects — biggest-spending projects ever" /><br/>
-  <sub><b>All‑time top projects</b> — tap the ⇄ chip to switch</sub>
+  <img src="docs/page-alltime.png" width="340" alt="All-time top projects: biggest-spending projects ever" /><br/>
+  <sub><b>All-time top projects</b>: tap the ⇄ chip to switch</sub>
 </td>
 <td align="center" width="50%">
-  <img src="docs/settings.png" width="340" alt="Right-click settings menu — icon, pause, launch at login, updates" /><br/>
-  <sub><b>Settings</b> — right‑click the island</sub>
+  <img src="docs/settings.png" width="340" alt="Right-click settings menu: icon, pause, hide in full screen, launch at login, updates" /><br/>
+  <sub><b>Settings</b>: right-click the island</sub>
 </td>
 </tr>
 </table>
 
 ## Features
 
-- **Real limit tiles** — your **5‑hour** session, **7‑day** weekly, *and* **Fable's own
-  weekly limit** (Fable is metered separately — the same three bars the Claude desktop app
-  shows), each with a reset countdown and colour‑coded urgency.
-- **Two pages, one swipe** — limits up front; swipe (or tap the dots) to a local‑detail page:
-  today vs all‑time spend, and your live sessions.
-- **Named sessions** — your actual **conversation titles** from the sidebar, with today's
-  spend per conversation. Tap the block to flip to your **all‑time biggest projects**.
-- **Cost, live** — cost & tokens today, an **"~$X by tonight"** projection, and all‑time
-  totals from a full‑history scan of your logs.
-- **Any Claude login works** — **Claude Desktop**, a **browser** signed into claude.ai, or the
-  **Claude Code CLI** (terminal‑only, no desktop app or browser needed).
-- **Clawd, the walking crab** — he quickens as you approach a limit and freezes when you're
-  out. Prefer a mono crab or the Claude Spark? Click to swap.
-- **Local‑first & private** — talks only to Anthropic with *your* session; nothing leaves your
-  Mac. Local cost/token figures are clearly labelled `local`.
-- **Zero fuss** — draws its own notch on non‑notch Macs, auto‑updates itself, and lives entirely
-  on a right‑click menu.
+- **Real limit tiles.** Your **5-hour** session, **7-day** weekly, *and* **Fable's own weekly
+  limit**. Fable is metered separately, so you get the same three bars the Claude desktop app
+  shows, each with a reset countdown and colour-coded urgency.
+- **Two pages, one swipe.** Limits up front. Swipe (or tap the dots) to a local detail page with
+  today versus all-time spend, plus your live sessions.
+- **Named sessions.** Your actual **conversation titles** from the sidebar, with today's spend per
+  conversation. Tap the block to flip to your **all-time biggest projects**.
+- **Cost, live.** Cost and tokens today, an **"~$X by tonight"** projection, and all-time totals
+  from a full-history scan of your logs.
+- **Any Claude login works.** Use **Claude Desktop**, a **browser** signed into claude.ai, or the
+  **Claude Code CLI** (terminal only, with no desktop app or browser needed).
+- **Hide in full screen.** An opt-in toggle tucks the island up into the notch while a full-screen
+  app owns the display, so movies and video stay uninterrupted, then slides it back on exit.
+- **Clawd, the walking crab.** He quickens as you approach a limit and freezes when you're out.
+  Prefer a mono crab or the Claude Spark? Click to swap.
+- **Local-first and private.** It talks only to Anthropic with *your* session, and nothing leaves
+  your Mac. Local cost and token figures are clearly labelled `local`.
+- **Zero fuss.** It draws its own notch on non-notch Macs, auto-updates itself, and lives entirely
+  on a right-click menu.
 
 ## How it works
 
-Claude Notch reads *your own* local Claude session — from **Claude Desktop**, a **browser
-signed into claude.ai** (Chrome, Brave, Edge, Arc, Firefox, Zen), or the **Claude Code CLI** —
-and calls the same usage endpoint the official apps use. It shows the exact limit bars the
-desktop app does, **including Fable's separate weekly limit**.
+Claude Notch reads *your own* local Claude session from **Claude Desktop**, a **browser signed into
+claude.ai** (Chrome, Brave, Edge, Arc, Firefox, Zen), or the **Claude Code CLI**. It calls the same
+usage endpoint the official apps use, and shows the exact limit bars the desktop app does,
+**including Fable's separate weekly limit**.
 
 For Desktop and browsers, the session cookie is read from the local cookie store (Chromium's is
 decrypted with the OS Keychain "Safe Storage" key, the same mechanism the browsers use). For the
-terminal, it reuses the Claude Code CLI's own login token from the Keychain — **read‑only, never
-refreshed, so your CLI session is left untouched**. macOS asks your permission via a Keychain
-prompt on first run.
+terminal, it reuses the Claude Code CLI's own login token from the Keychain. That read is
+**read-only and never refreshed, so your CLI session is left untouched**. macOS asks your
+permission via a Keychain prompt on first run.
 
-> **Limits vs. local.** The 5‑hour / 7‑day / Fable tiles come from Anthropic and cover **all** your
-> usage (including cloud/remote sessions). The `cost today` and `tokens today` figures are computed
-> from your **local** `~/.claude` logs, so they're labelled `local` — cloud work counts toward the
-> limit bars but not the local dollar figure.
+> **Limits vs. local.** The 5-hour, 7-day, and Fable tiles come from Anthropic and cover **all**
+> your usage, including cloud and remote sessions. The `cost today` and `tokens today` figures are
+> computed from your **local** `~/.claude` logs, so they're labelled `local`. Cloud work counts
+> toward the limit bars but not toward the local dollar figure.
 
 ## Requirements
 
 - macOS 14+ (Apple Silicon or Intel)
-- A signed‑in Claude session — **Claude Desktop**, a supported **browser** on claude.ai, or the
+- A signed-in Claude session: **Claude Desktop**, a supported **browser** on claude.ai, or the
   **Claude Code CLI**
 
 ## Install
 
-**Download:** grab the latest `Claude Notch.zip` from [Releases](../../releases) → unzip → drag
-`Claude Notch.app` to Applications → **double‑click** to open (it's signed + **notarized**, so no
-security warning). On first run, **Always Allow** the Keychain prompt so it can read your local
-Claude session. Right‑click the island → *Launch at Login* to keep it around.
+**Download:** grab the latest `Claude Notch.zip` from [Releases](../../releases), unzip it, drag
+`Claude Notch.app` to Applications, then **double-click** to open. It's signed and **notarized**, so
+there's no security warning. On first run, **Always Allow** the Keychain prompt so it can read your
+local Claude session. To keep it around, right-click the island and choose *Launch at Login*.
 
 **Build from source:**
 
@@ -105,26 +107,27 @@ swift run ClaudeNotch        # dev run
 bash scripts/make-app.sh     # builds dist/Claude Notch.app + a shareable zip
 ```
 
-Requires a full Xcode toolchain (the SwiftUI macros need it) —
+Requires a full Xcode toolchain (the SwiftUI macros need it). Run
 `export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` if `swift` points at the
 Command Line Tools.
 
 ## Usage
 
-- **Click** the % / ring → expand; **click away** → collapse.
-- **Swipe** left/right (or tap the dots) → switch between the limits page and the detail page.
-- **Tap the sessions block** → flip between today's active sessions and all‑time top projects.
-- **Click Clawd** → cycle icon (Clawd → mono → Spark).
-- **Right‑click** the island → Icon, Pause, Animate icon, Launch at Login, Check for Updates, Quit.
+- **Click** the % or ring to expand, and **click away** to collapse.
+- **Swipe** left or right (or tap the dots) to switch between the limits page and the detail page.
+- **Tap the sessions block** to flip between today's active sessions and all-time top projects.
+- **Click Clawd** to cycle the icon (Clawd, then mono, then Spark).
+- **Right-click** the island for Icon, Pause, Animate icon, Hide in full screen, Launch at Login,
+  Check for Updates, and Quit.
 
 ## Credits
 
-- Clawd crab + Spark animation frames © **Mick Cesanek**
+- Clawd crab and Spark animation frames © **Mick Cesanek**
   ([claude-status-bar](https://github.com/m1ckc3s/claude-status-bar), MIT).
-- Notch‑shape and Dynamic‑Island approach inspired by
+- Notch shape and Dynamic Island approach inspired by
   [pookify](https://github.com/eyadhammouda/pookify) (MIT).
 - "Claude" and the spark are trademarks of Anthropic, PBC, used nominatively.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Built with [Claude Code](https://claude.com/claude-code).
+MIT. See [LICENSE](LICENSE). Built with [Claude Code](https://claude.com/claude-code).
