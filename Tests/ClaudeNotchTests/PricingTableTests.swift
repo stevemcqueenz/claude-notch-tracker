@@ -5,7 +5,8 @@ import Foundation
 @Suite struct PricingTableTests {
     func event(model: String) -> UsageEvent {
         UsageEvent(timestamp: .init(), sessionId: "s", requestId: nil, messageId: nil,
-            model: model, inputTokens: 1_000_000, outputTokens: 1_000_000,
+            model: model, cwd: "/tmp/project",
+            inputTokens: 1_000_000, outputTokens: 1_000_000,
             cacheCreationTokens: 0, cacheReadTokens: 0)
     }
 

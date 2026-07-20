@@ -8,6 +8,7 @@ import Foundation
         f.formatOptions = [.withInternetDateTime]
         return UsageEvent(timestamp: f.date(from: iso)!, sessionId: session,
             requestId: nil, messageId: nil, model: "claude-opus-4-8",
+            cwd: "/tmp/project",
             inputTokens: tokens, outputTokens: 0, cacheCreationTokens: 0,
             cacheReadTokens: 0)
     }
