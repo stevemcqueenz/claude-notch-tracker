@@ -83,11 +83,12 @@ final class IslandWindow {
     /// turning the option off.
     func show() {
         guard let rest = restingFrame() else { panel.orderFrontRegardless(); return }
-        if panel.isVisible { panel.setFrame(rest, display: true); panel.alphaValue = 1; return }
-        var start = rest; start.origin.y += slideDistance      // begin retracted above the edge
-        panel.setFrame(start, display: false)
-        panel.alphaValue = 0
-        panel.orderFrontRegardless()
+        if !panel.isVisible {                                  // first appearance: start retracted
+            var start = rest; start.origin.y += slideDistance
+            panel.setFrame(start, display: false)
+            panel.alphaValue = 0
+            panel.orderFrontRegardless()
+        }
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.28
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
@@ -96,21 +97,20 @@ final class IslandWindow {
         }
     }
 
-    /// Slide the pill up into the notch and fade it out, then actually order it out. Reads as the
-    /// island tucking away as the app goes fullscreen, rather than blinking off.
+    /// Slide the pill up into the notch and fade it out. The panel is NOT ordered out — removing it
+    /// from the window list while a fullscreen Space is active makes macOS drop its
+    /// `.canJoinAllSpaces` membership, pinning it to one Space afterward. Staying in the list (just
+    /// transparent + slid up) keeps it on every Space. Mouse handling is left untouched: the pill is
+    /// slid up out of its interactive zone, and clicks elsewhere already pass through via hitTest.
     func hide() {
         model.isExpanded = false                               // never slide away mid-expand
-        guard let rest = restingFrame(), panel.isVisible else { panel.orderOut(nil); return }
+        guard let rest = restingFrame() else { return }
         var end = rest; end.origin.y += slideDistance
-        NSAnimationContext.runAnimationGroup { [self] ctx in
+        NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.28
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
             panel.animator().setFrame(end, display: true)
             panel.animator().alphaValue = 0
-        } completionHandler: { [self] in
-            panel.orderOut(nil)
-            panel.setFrame(rest, display: false)               // reset for the next show / relayout
-            panel.alphaValue = 1
         }
     }
 }
