@@ -112,6 +112,28 @@ import Testing
         #expect(snapshot.limits.map(\.usedFraction) == [0.42, 0.70, 0.05])
     }
 
+    @Test func ordersShortCodexWindowBeforeWeeklyWhenServerSwapsPrimaryAndSecondary() throws {
+        let rateLimits = try decode(CodexRateLimitsResponse.self, json: """
+        {
+          "rateLimits": {
+            "limitId": "codex",
+            "limitName": "Codex",
+            "primary": {"usedPercent": 70, "windowDurationMins": 10080, "resetsAt": 1785160800},
+            "secondary": {"usedPercent": 42, "windowDurationMins": 300, "resetsAt": 1784556000}
+          },
+          "rateLimitsByLimitId": null
+        }
+        """)
+
+        let snapshot = CodexSnapshotMapper.make(
+            account: nil, rateLimits: rateLimits, usage: nil, threads: nil, now: Date()
+        )
+
+        #expect(snapshot.limits.map(\.label) == ["5-Hour", "7-Day"])
+        #expect(snapshot.limits.map(\.usedFraction) == [0.42, 0.70])
+        #expect(snapshot.primaryUsage == 0.42)
+    }
+
     @Test func fillsSpareTilesWithLifetimeStatsAndFlagsSpendControl() throws {
         // Shaped like a real account with one 30-day window, no secondary, and a lagging daily
         // feed — the case that otherwise renders a sparse four-tile page.

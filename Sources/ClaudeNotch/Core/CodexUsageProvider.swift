@@ -218,13 +218,40 @@ enum CodexSnapshotMapper {
         let usesBucketPrefix = buckets.count > 1
         return buckets.flatMap { key, snapshot in
             let bucketName = snapshot.limitName ?? snapshot.limitId ?? key
-            return [
-                makeLimit(prefix: key, kind: "primary", window: snapshot.primary,
-                          bucketName: bucketName, usesBucketPrefix: usesBucketPrefix),
-                makeLimit(prefix: key, kind: "secondary", window: snapshot.secondary,
-                          bucketName: bucketName, usesBucketPrefix: usesBucketPrefix),
-            ].compactMap { $0 }
+            return makeLimits(
+                prefix: key,
+                snapshot: snapshot,
+                bucketName: bucketName,
+                usesBucketPrefix: usesBucketPrefix
+            )
         }
+    }
+
+    private static func makeLimits(
+        prefix: String,
+        snapshot: CodexRateLimitsResponse.Snapshot,
+        bucketName: String,
+        usesBucketPrefix: Bool
+    ) -> [UsageLimitMetric] {
+        let raw = [
+            (sourceOrder: 0, metric: makeLimit(prefix: prefix, kind: "primary",
+                                               window: snapshot.primary,
+                                               bucketName: bucketName,
+                                               usesBucketPrefix: usesBucketPrefix)),
+            (sourceOrder: 1, metric: makeLimit(prefix: prefix, kind: "secondary",
+                                               window: snapshot.secondary,
+                                               bucketName: bucketName,
+                                               usesBucketPrefix: usesBucketPrefix)),
+        ].compactMap { entry in
+            entry.metric.map { (sourceOrder: entry.sourceOrder, metric: $0) }
+        }
+
+        return raw.sorted { lhs, rhs in
+            let lhsOrder = durationOrder(lhs.metric.label)
+            let rhsOrder = durationOrder(rhs.metric.label)
+            if lhsOrder != rhsOrder { return lhsOrder < rhsOrder }
+            return lhs.sourceOrder < rhs.sourceOrder
+        }.map(\.metric)
     }
 
     private static func makeLimit(
@@ -243,6 +270,19 @@ enum CodexSnapshotMapper {
             usedFraction: Double(window.usedPercent) / 100,
             resetsAt: window.resetsAt.map { Date(timeIntervalSince1970: TimeInterval($0)) }
         )
+    }
+
+    private static func durationOrder(_ label: String) -> Int {
+        let duration = label.split(separator: "·").last?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? label
+        switch duration {
+        case "5-Hour": return 0
+        case "Daily": return 1
+        case "7-Day": return 2
+        case "Monthly": return 3
+        case "Annual": return 4
+        default: return 5
+        }
     }
 
     private static func durationLabel(_ minutes: Int?) -> String {

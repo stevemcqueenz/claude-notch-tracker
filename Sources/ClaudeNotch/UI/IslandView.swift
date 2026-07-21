@@ -137,6 +137,12 @@ struct IslandView: View {
                 // the right-click Icon menu.
                 .onTapGesture { model.cycleProvider() }
                 .help("Click to switch provider")
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Switch provider")
+                .accessibilityValue(model.selectedProvider.displayName)
+                .accessibilityHint("Switches between Claude and Codex")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityInputLabels(["Switch provider", model.selectedProvider.displayName])
 
             Color.clear.frame(width: gap, height: closedH)
 
