@@ -78,6 +78,7 @@ struct CodexRateLimitsResponse: Decodable, Sendable {
         let planType: String?
         let primary: Window?
         let secondary: Window?
+        let spendControlReached: Bool?
     }
 
     let rateLimits: Snapshot
@@ -87,6 +88,10 @@ struct CodexRateLimitsResponse: Decodable, Sendable {
 struct CodexAccountUsageResponse: Decodable, Sendable {
     struct Summary: Decodable, Sendable {
         let lifetimeTokens: Int?
+        let peakDailyTokens: Int?
+        let longestRunningTurnSec: Int?
+        let currentStreakDays: Int?
+        let longestStreakDays: Int?
     }
 
     struct DailyBucket: Decodable, Sendable {
@@ -143,6 +148,22 @@ enum CodexSnapshotMapper {
         if let planName {
             stats.append(.init(id: "plan", label: "plan", value: planName, subtitle: nil))
         }
+        // Spare-capacity lifetime stats, deliberately LAST: the grid caps at six tiles, so these
+        // only fill slots the important tiles left empty (accounts with one limit window and a
+        // lagging daily feed would otherwise show a sparse four-tile page).
+        if let peak = usage?.summary.peakDailyTokens, peak > 0 {
+            stats.append(.init(id: "peak-day", label: "peak day",
+                               value: Fmt.tokens(peak), subtitle: nil))
+        }
+        if let turn = usage?.summary.longestRunningTurnSec, turn > 0 {
+            stats.append(.init(id: "longest-task", label: "longest task",
+                               value: turnLabel(turn), subtitle: nil))
+        }
+        if let longest = usage?.summary.longestStreakDays, longest > 0 {
+            let current = usage?.summary.currentStreakDays ?? 0
+            stats.append(.init(id: "streak", label: "streak",
+                               value: "\(current)d", subtitle: "best \(longest)d"))
+        }
 
         let sessions = threads?.data.prefix(3).map { thread in
             UsageSessionMetric(
@@ -155,7 +176,9 @@ enum CodexSnapshotMapper {
         } ?? []
 
         var message: String?
-        if account?.account?.type == "apiKey", usage == nil {
+        if spendControlReached(rateLimits) {
+            message = "Spend limit reached"
+        } else if account?.account?.type == "apiKey", usage == nil {
             message = "Account usage requires ChatGPT sign-in"
         } else if !errors.isEmpty, limits.isEmpty || usage == nil {
             // Surface the first problem whenever a whole section is missing — including partial
@@ -225,6 +248,19 @@ enum CodexSnapshotMapper {
         case let value where value % 60 == 0: "\(value / 60)-Hour"
         default: "\(minutes)-Min"
         }
+    }
+
+    /// "15h 15m" / "42m" for the longest-running task turn.
+    private static func turnLabel(_ seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        return hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes)m"
+    }
+
+    private static func spendControlReached(_ response: CodexRateLimitsResponse?) -> Bool {
+        guard let response else { return false }
+        let snapshots = [response.rateLimits] + (response.rateLimitsByLimitId?.values.map { $0 } ?? [])
+        return snapshots.contains { $0.spendControlReached == true }
     }
 
     private static func creditsLabel(_ response: CodexRateLimitsResponse) -> String? {

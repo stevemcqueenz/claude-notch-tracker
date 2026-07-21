@@ -75,6 +75,52 @@ import Testing
         #expect(snapshot.statusMessage == nil)
     }
 
+    @Test func fillsSpareTilesWithLifetimeStatsAndFlagsSpendControl() throws {
+        // Shaped like a real account with one 30-day window, no secondary, and a lagging daily
+        // feed — the case that otherwise renders a sparse four-tile page.
+        let rateLimits = try decode(CodexRateLimitsResponse.self, json: """
+        {
+          "rateLimits": {
+            "credits": {"balance": null, "hasCredits": false, "unlimited": false},
+            "limitId": "codex",
+            "limitName": null,
+            "planType": "free",
+            "primary": {"usedPercent": 0, "windowDurationMins": 43200, "resetsAt": 1787222684},
+            "secondary": null,
+            "spendControlReached": true
+          },
+          "rateLimitsByLimitId": null
+        }
+        """)
+        let usage = try decode(CodexAccountUsageResponse.self, json: """
+        {
+          "summary": {
+            "lifetimeTokens": 1914879665,
+            "peakDailyTokens": 501548755,
+            "longestRunningTurnSec": 54891,
+            "currentStreakDays": 0,
+            "longestStreakDays": 9
+          },
+          "dailyUsageBuckets": []
+        }
+        """)
+
+        let snapshot = CodexSnapshotMapper.make(
+            account: nil, rateLimits: rateLimits, usage: usage, threads: nil, now: Date()
+        )
+
+        #expect(snapshot.limits.map(\.label) == ["30-Day"])
+        #expect(snapshot.stats.first(where: { $0.id == "peak-day" })?.value == Fmt.tokens(501_548_755))
+        #expect(snapshot.stats.first(where: { $0.id == "longest-task" })?.value == "15h 14m")
+        let streak = snapshot.stats.first(where: { $0.id == "streak" })
+        #expect(streak?.value == "0d")
+        #expect(streak?.subtitle == "best 9d")
+        #expect(snapshot.statusMessage == "Spend limit reached")
+        // Spare stats stay behind the important ones so a six-slot grid drops them first.
+        let ids = snapshot.stats.map(\.id)
+        #expect(ids.firstIndex(of: "peak-day")! > ids.firstIndex(of: "credits")!)
+    }
+
     @Test func explainsMissingUsageForAPIKeyAuth() throws {
         let account = try decode(CodexAccountResponse.self, json: """
         {
