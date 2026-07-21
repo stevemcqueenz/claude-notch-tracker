@@ -3,7 +3,7 @@ import ServiceManagement
 
 enum AppInfo {
     static let version = "0.2.0"
-    static let tagline = "Claude + Codex"
+    static let tagline = "Made with Claude"
 }
 
 /// Launch-at-login toggle (only effective when running as a bundled .app).
