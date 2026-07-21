@@ -1,46 +1,70 @@
-# 多 Provider 架构
+# Provider Architecture
 
-当前应用同时支持 Claude 与 Codex。界面只依赖统一的 `ProviderUsageSnapshot`，各 Provider 负责把自己的数据映射为限额、统计、会话和状态信息。
+Claude Notch supports Claude and Codex through a shared `ProviderUsageSnapshot` model. The UI only
+renders normalized limits, statistics, recent activity, plan metadata, and status information;
+each provider owns its data acquisition and mapping logic.
 
 ## Claude
 
-Claude Provider 保留原有行为：
+The Claude provider keeps the existing behavior:
 
-- 从 Claude Desktop、浏览器或 Claude Code 登录态读取账户限额；
-- 从本地 Claude 日志计算当天与历史 token、成本和会话；
-- 支持 5 小时、7 天、Fable 限额与成本预测。
+- reads account limits from a signed-in Claude Desktop, supported browser, or Claude Code session;
+- computes local token, cost, and session totals from Claude Code logs;
+- shows 5-hour, 7-day, Fable, and projected cost metrics.
 
 ## Codex
 
-Codex Provider 只使用官方 `codex app-server` JSON-RPC 接口：
+The Codex provider uses the official local `codex app-server` JSON-RPC interface:
 
-- `account/read`：读取登录类型和套餐；
-- `account/rateLimits/read`：读取动态限额窗口、重置时间和 credits；
-- `account/usage/read`：读取当天与历史 token；
-- `thread/list`：读取最近任务。
+- `account/read` returns the login type and plan;
+- `account/rateLimits/read` returns dynamic limit windows, reset times, and credits;
+- `account/usage/read` returns account-level daily and lifetime token totals;
+- `thread/list` returns recent task metadata.
 
-应用不会解析 `~/.codex/sessions` 私有 JSONL，也不会根据 token 估算 Codex 美元成本。ChatGPT 登录可以提供账户 token 统计；仅 API key 登录时，官方接口不会返回账户级用量，界面会明确提示这一限制。
+The app does not parse private `~/.codex/sessions` JSONL files and does not estimate Codex dollar
+costs. Account-level token totals require ChatGPT authentication; API-key-only sessions may still
+return rate limits but the official interface does not provide account usage totals.
 
-默认从以下位置寻找 Codex 可执行文件：
+The executable is discovered in this order:
 
-1. `CODEX_NOTCH_BINARY` 指定的路径；
-2. ChatGPT 或 Codex 应用内置的可执行文件；
-3. Homebrew 常见路径；
-4. 当前 `PATH`。
+1. the explicit `CODEX_NOTCH_BINARY` path;
+2. the binary bundled with the ChatGPT or Codex app;
+3. common Homebrew locations;
+4. the inherited `PATH`.
 
-## 刷新与切换
+Only configure `CODEX_NOTCH_BINARY` with a trusted executable. The app launches the selected binary
+with fixed `app-server --stdio` arguments and never invokes a shell.
 
-左侧图标可在 Claude 与 Codex 之间切换，右键菜单也提供显式 Provider 选择。选择会持久化。应用只轮询当前 Provider，切换后立即刷新，避免后台持续启动不需要的服务。
+## Refresh and Switching
 
-## 验证
+Click the left icon to switch between Claude and Codex, or select a provider from the context menu.
+The selection is persisted. Only the active provider is polled, and switching triggers an immediate
+refresh.
 
-运行完整测试：
+## Security and Privacy Boundaries
+
+- Provider reads are read-only. Claude Notch does not persist login tokens, browser cookies,
+  prompts, or account responses in application storage.
+- Codex responses are capped at 8 MiB, and raw app-server stderr or RPC error details are not shown
+  in the notch.
+- Raw Codex prompt previews and account email addresses are neither decoded for display nor retained
+  by the provider model. Recent activity falls back to the local project folder name.
+- Claude browser-cookie queries match only `claude.ai` and `.claude.ai`; temporary SQLite copies use
+  owner-only permissions and are deleted after each read.
+- Sparkle updates remain pinned to the upstream HTTPS appcast and verified with the upstream EdDSA
+  public key.
+- The app is not sandboxed because its core features require read-only access to browser session
+  stores, Claude Code logs, and the locally installed Codex executable.
+
+## Validation
+
+Run the full test suite:
 
 ```bash
 swift test
 ```
 
-在已经登录 Codex 的机器上运行真实 app-server 集成测试：
+Run the opt-in live Codex integration test on a machine with an authenticated Codex installation:
 
 ```bash
 CODEX_NOTCH_RUN_INTEGRATION_TEST=1 swift test --filter liveAppServerExchangeWhenRequested

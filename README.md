@@ -1,8 +1,8 @@
 <div align="center">
 
-# 🦀 Claude Notch Usage Companion
+# 🦀 Claude + Codex Notch Usage Companion
 
-**Your live Claude usage in your Mac's notch: 5-hour, 7-day, Fable, and cost.**
+**Live Claude and Codex usage in your Mac's notch: limits, resets, tokens, and cost.**
 
 <img src="docs/demo.gif" width="640" alt="Claude Notch: click to expand, swipe between the limits and detail pages, and tap to switch active sessions or all-time" />
 
@@ -50,6 +50,8 @@ your spend and sessions sit behind. Click away and it glides shut. No Dock icon,
 - **Real limit tiles.** Your **5-hour** session, **7-day** weekly, *and* **Fable's own weekly
   limit**. Fable is metered separately, so you get the same three bars the Claude desktop app
   shows, each with a reset countdown and colour-coded urgency.
+- **Claude and Codex providers.** Click the left icon to switch providers. Codex limits, credits,
+  plan, token totals, and recent tasks come from the official local `codex app-server` interface.
 - **Two pages, one swipe.** Limits up front. Swipe (or tap the dots) to a local detail page with
   today versus all-time spend, plus your live sessions.
 - **Named sessions.** Your actual **conversation titles** from the sidebar, with today's spend per
@@ -62,8 +64,8 @@ your spend and sessions sit behind. Click away and it glides shut. No Dock icon,
   app owns the display, so movies and video stay uninterrupted, then slides it back on exit.
 - **Clawd, the walking crab.** He quickens as you approach a limit and freezes when you're out.
   Prefer a mono crab or the Claude Spark? Click to swap.
-- **Local-first and private.** It talks only to Anthropic with *your* session, and nothing leaves
-  your Mac. Local cost and token figures are clearly labelled `local`.
+- **Local-first and private.** Claude Notch reads local provider state and talks only to the
+  corresponding first-party service. Local cost and token figures are clearly labelled `local`.
 - **Zero fuss.** It draws its own notch on non-notch Macs, auto-updates itself, and lives entirely
   on a right-click menu.
 
@@ -85,11 +87,15 @@ permission via a Keychain prompt on first run.
 > computed from your **local** `~/.claude` logs, so they're labelled `local`. Cloud work counts
 > toward the limit bars but not toward the local dollar figure.
 
+For Codex, Claude Notch starts the installed official `codex app-server` with fixed JSON-RPC
+requests. It does not parse private Codex session logs or estimate dollar costs. Raw prompt previews
+and account email addresses are not displayed or retained. See
+[Provider Architecture](docs/providers.md) for data sources and security boundaries.
+
 ## Requirements
 
 - macOS 14+ (Apple Silicon or Intel)
-- A signed-in Claude session: **Claude Desktop**, a supported **browser** on claude.ai, or the
-  **Claude Code CLI**
+- A signed-in Claude session, an authenticated Codex installation, or both
 
 ## Install
 
@@ -116,9 +122,9 @@ Command Line Tools.
 - **Click** the % or ring to expand, and **click away** to collapse.
 - **Swipe** left or right (or tap the dots) to switch between the limits page and the detail page.
 - **Tap the sessions block** to flip between today's active sessions and all-time top projects.
-- **Click Clawd** to cycle the icon (Clawd, then mono, then Spark).
-- **Right-click** the island for Icon, Pause, Animate icon, Hide in full screen, Launch at Login,
-  Check for Updates, and Quit.
+- **Click the left icon** to switch between Claude and Codex.
+- **Right-click** the island for Provider, Icon, Pause, Animate icon, Hide in full screen, Launch at
+  Login, Check for Updates, and Quit.
 
 ## Credits
 
@@ -127,6 +133,7 @@ Command Line Tools.
 - Notch shape and Dynamic Island approach inspired by
   [pookify](https://github.com/eyadhammouda/pookify) (MIT).
 - "Claude" and the spark are trademarks of Anthropic, PBC, used nominatively.
+- "Codex" and the Codex logo are trademarks of OpenAI, used nominatively.
 
 ## License
 

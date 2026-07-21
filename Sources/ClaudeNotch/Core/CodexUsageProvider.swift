@@ -27,7 +27,6 @@ actor CodexUsageProvider {
 struct CodexAccountResponse: Decodable, Sendable {
     struct Account: Decodable, Sendable {
         let type: String
-        let email: String?
         let planType: String?
     }
 
@@ -80,7 +79,6 @@ struct CodexThreadListResponse: Decodable, Sendable {
         let id: String
         let cwd: String
         let name: String?
-        let preview: String
         let updatedAt: Int
     }
 
@@ -228,8 +226,6 @@ enum CodexSnapshotMapper {
         if let name = thread.name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
             return name
         }
-        let preview = thread.preview.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !preview.isEmpty { return preview }
         let folder = (thread.cwd as NSString).lastPathComponent
         return folder.isEmpty ? "Codex task" : folder
     }
@@ -251,20 +247,15 @@ private struct CodexAppServerTransport: Sendable {
         let process = Process()
         let input = Pipe()
         let output = Pipe()
-        let errorOutput = Pipe()
         let collector = CodexRPCCollector()
-        let errorCollector = CodexStderrCollector()
 
         process.executableURL = executable
         process.arguments = ["app-server", "--stdio"]
         process.standardInput = input
         process.standardOutput = output
-        process.standardError = errorOutput
+        process.standardError = FileHandle.nullDevice
         output.fileHandleForReading.readabilityHandler = { handle in
             collector.append(handle.availableData)
-        }
-        errorOutput.fileHandleForReading.readabilityHandler = { handle in
-            errorCollector.append(handle.availableData)
         }
         process.terminationHandler = { _ in collector.markProcessExited() }
 
@@ -300,15 +291,12 @@ private struct CodexAppServerTransport: Sendable {
             ], to: input.fileHandleForWriting)
             try collector.wait(for: [2, 3, 4, 5], timeout: 12)
         } catch {
-            let stderr = errorCollector.text
-            cleanup(process: process, input: input, output: output, errorOutput: errorOutput)
-            if !stderr.isEmpty {
-                throw CodexProviderError.transport("\(error.localizedDescription): \(stderr)")
-            }
-            throw error
+            cleanup(process: process, input: input, output: output)
+            if let providerError = error as? CodexProviderError { throw providerError }
+            throw CodexProviderError.transport
         }
 
-        cleanup(process: process, input: input, output: output, errorOutput: errorOutput)
+        cleanup(process: process, input: input, output: output)
         return collector.exchange
     }
 
@@ -323,9 +311,8 @@ private struct CodexAppServerTransport: Sendable {
         try handle.write(contentsOf: data)
     }
 
-    private func cleanup(process: Process, input: Pipe, output: Pipe, errorOutput: Pipe) {
+    private func cleanup(process: Process, input: Pipe, output: Pipe) {
         output.fileHandleForReading.readabilityHandler = nil
-        errorOutput.fileHandleForReading.readabilityHandler = nil
         try? input.fileHandleForWriting.close()
         if process.isRunning { process.terminate() }
     }
@@ -353,12 +340,15 @@ private struct CodexAppServerTransport: Sendable {
 }
 
 private final class CodexRPCCollector: @unchecked Sendable {
+    private static let maximumBufferedBytes = 8 * 1_024 * 1_024
     private let condition = NSCondition()
     private var buffer = Data()
     private var results: [Int: Data] = [:]
     private var errors: [Int: String] = [:]
     private var completedIDs = Set<Int>()
     private var processExited = false
+    private var streamError: CodexProviderError?
+    private var receivedBytes = 0
 
     func append(_ data: Data) {
         condition.lock()
@@ -368,6 +358,13 @@ private final class CodexRPCCollector: @unchecked Sendable {
             condition.broadcast()
             return
         }
+        guard data.count <= Self.maximumBufferedBytes - receivedBytes else {
+            streamError = .responseTooLarge
+            buffer.removeAll(keepingCapacity: false)
+            condition.broadcast()
+            return
+        }
+        receivedBytes += data.count
         buffer.append(data)
         while let newline = buffer.firstIndex(of: 0x0A) {
             let line = Data(buffer[..<newline])
@@ -387,12 +384,13 @@ private final class CodexRPCCollector: @unchecked Sendable {
         let deadline = Date().addingTimeInterval(timeout)
         condition.lock()
         defer { condition.unlock() }
-        while !ids.isSubset(of: completedIDs), !processExited {
+        while !ids.isSubset(of: completedIDs), !processExited, streamError == nil {
             if !condition.wait(until: deadline) { break }
         }
+        if let streamError { throw streamError }
         guard ids.isSubset(of: completedIDs) else {
             if processExited {
-                throw CodexProviderError.transport("Codex app-server exited before responding")
+                throw CodexProviderError.transport
             }
             throw CodexProviderError.timeout
         }
@@ -412,36 +410,19 @@ private final class CodexRPCCollector: @unchecked Sendable {
            let data = try? JSONSerialization.data(withJSONObject: result) {
             results[id] = data
         }
-        if let error = object["error"] as? [String: Any] {
-            errors[id] = error["message"] as? String ?? "Codex request failed"
+        if object["error"] is [String: Any] {
+            errors[id] = "Codex request failed"
         }
         completedIDs.insert(id)
         condition.broadcast()
     }
 }
 
-private final class CodexStderrCollector: @unchecked Sendable {
-    private let lock = NSLock()
-    private var data = Data()
-
-    func append(_ chunk: Data) {
-        guard !chunk.isEmpty else { return }
-        lock.lock()
-        data.append(chunk)
-        lock.unlock()
-    }
-
-    var text: String {
-        lock.lock()
-        defer { lock.unlock() }
-        return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-    }
-}
-
 private enum CodexProviderError: LocalizedError {
     case executableNotFound
     case timeout
-    case transport(String)
+    case responseTooLarge
+    case transport
 
     var errorDescription: String? {
         switch self {
@@ -449,8 +430,10 @@ private enum CodexProviderError: LocalizedError {
             "Codex executable not found"
         case .timeout:
             "Codex app-server timed out"
-        case .transport(let message):
-            message
+        case .responseTooLarge:
+            "Codex app-server response was too large"
+        case .transport:
+            "Codex app-server request failed"
         }
     }
 }

@@ -97,6 +97,31 @@ import Testing
         #expect(snapshot.lifetimeCost == nil)
     }
 
+    @Test func neverDisplaysRawThreadPreview() throws {
+        let threads = try decode(CodexThreadListResponse.self, json: """
+        {
+          "data": [{
+            "id": "thread-private",
+            "cwd": "/Users/example/Projects/notch",
+            "name": null,
+            "preview": "Confidential prompt content",
+            "updatedAt": 1784552400
+          }]
+        }
+        """)
+
+        let snapshot = CodexSnapshotMapper.make(
+            account: nil,
+            rateLimits: nil,
+            usage: nil,
+            threads: threads,
+            now: Date()
+        )
+
+        #expect(snapshot.sessions.first?.name == "notch")
+        #expect(snapshot.sessions.first?.name != "Confidential prompt content")
+    }
+
     private func decode<T: Decodable>(_ type: T.Type, json: String) throws -> T {
         try JSONDecoder().decode(type, from: Data(json.utf8))
     }

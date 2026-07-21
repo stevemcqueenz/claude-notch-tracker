@@ -1,17 +1,15 @@
-Claude Notch — a Dynamic Island usage tracker for your Mac's notch
-==================================================================
+Claude + Codex Notch — usage tracking in your Mac's notch
+==========================================================
 
-Shows your Claude 5-hour, 7-day and credit usage right in the notch,
-with Clawd the crab. Same numbers you see in Claude Desktop.
+Shows Claude and Codex limits, reset times, credits and token totals
+right in the notch, with provider-specific animated icons.
 
 REQUIREMENTS
 ------------
 • macOS 14 or newer (Apple Silicon or Intel), notch or not (it draws
   its own on non-notch Macs).
-• A Claude session on your Mac — EITHER Claude Desktop signed in, OR a
-  browser (Chrome, Brave, Edge, Arc, Firefox, Zen) signed in to
-  claude.ai. The tracker reads YOUR own local session to show YOUR own
-  usage — nothing of the sender's, nothing leaves your machine.
+• A signed-in Claude session, an authenticated Codex installation, or
+  both. Claude supports Desktop, browser and Claude Code sessions.
 
 INSTALL
 -------
@@ -29,16 +27,19 @@ USING IT
   5-hour session % + ring on the right.
 • Click the % / ring to expand: 5-Hour, 7-Day, credits, cost today,
   tokens today, and your plan — each in a tile. Click away to collapse.
-• Click Clawd to switch icon (Clawd → mono → Spark).
-• Right-click the island for the menu: icon, pause, launch at login, quit.
+• Click the left icon to switch between Claude and Codex.
+• Right-click the island for provider, icon, animation, pause, launch at
+  login, updates and quit.
 
 PRIVACY
 -------
-Talks only to https://claude.ai (the same server Claude Desktop uses) to
-fetch your usage, using your own local session. No analytics, no third-
-party servers, nothing sent to anyone else.
+Claude data is read from your local session and Anthropic's first-party
+usage endpoint. Codex data comes from the installed official codex
+app-server. No analytics or third-party servers are used. Raw Codex prompt
+previews and account email addresses are not displayed or retained.
 
 CREDITS
 -------
 Clawd crab animation © Mick Cesanek (claude-status-bar, MIT). "Claude" and
-the spark are trademarks of Anthropic, used nominatively. Made with Claude.
+the spark are trademarks of Anthropic. "Codex" and its logo are trademarks
+of OpenAI. All marks are used nominatively.

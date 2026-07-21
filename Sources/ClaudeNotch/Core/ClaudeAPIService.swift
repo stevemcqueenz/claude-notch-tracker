@@ -190,7 +190,10 @@ actor ClaudeAPIService {
             let from = URL(fileURLWithPath: source.path.path + s)
             let to = URL(fileURLWithPath: base.path + s)
             try? fm.removeItem(at: to)
-            if (try? fm.copyItem(at: from, to: to)) != nil, s.isEmpty { copiedMain = true }
+            if (try? fm.copyItem(at: from, to: to)) != nil {
+                try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: to.path)
+                if s.isEmpty { copiedMain = true }
+            }
         }
         guard copiedMain else { return nil }
         defer { for s in suffixes { try? fm.removeItem(at: URL(fileURLWithPath: base.path + s)) } }
@@ -212,7 +215,8 @@ actor ClaudeAPIService {
     private func readChromium(_ db: OpaquePointer, service: String) -> [String: String]? {
         guard let key = safeStorageKey(service: service) else { return nil }
         var stmt: OpaquePointer?
-        let sql = "SELECT name, encrypted_value FROM cookies WHERE host_key LIKE '%claude.ai%'"
+        let sql = "SELECT name, encrypted_value FROM cookies "
+            + "WHERE host_key IN ('claude.ai', '.claude.ai')"
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
         defer { sqlite3_finalize(stmt) }
         var out: [String: String] = [:]
@@ -228,7 +232,8 @@ actor ClaudeAPIService {
 
     private func readFirefox(_ db: OpaquePointer) -> [String: String]? {
         var stmt: OpaquePointer?
-        let sql = "SELECT name, value FROM moz_cookies WHERE host LIKE '%claude.ai%'"
+        let sql = "SELECT name, value FROM moz_cookies "
+            + "WHERE host IN ('claude.ai', '.claude.ai')"
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
         defer { sqlite3_finalize(stmt) }
         var out: [String: String] = [:]
