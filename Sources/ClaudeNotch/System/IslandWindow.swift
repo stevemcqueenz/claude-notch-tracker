@@ -23,10 +23,18 @@ final class NotchPanel: NSPanel {
 
 /// Only claims mouse events inside `interactiveRect` (the pill's footprint). Everywhere else it
 /// returns nil so clicks fall through to the menu bar / desktop / other apps.
+///
+/// NOTE: that fall-through works because the window server click-throughs transparent pixels of a
+/// borderless non-opaque window. NEVER set `panel.ignoresMouseEvents` explicitly (even to false):
+/// doing so disables that per-pixel behavior for the whole frame, and every click in the top strip
+/// gets routed to us and dies here — dead menu bar and title-bar buttons under the strip.
 final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
     var interactiveRect: CGRect = .zero
+    /// Cleared while the pill is retracted for fullscreen so a hidden pill can never claim a click.
+    var interactionEnabled = true
     override func hitTest(_ point: NSPoint) -> NSView? {
-        interactiveRect.contains(point) ? super.hitTest(point) : nil
+        guard interactionEnabled, interactiveRect.contains(point) else { return nil }
+        return super.hitTest(point)
     }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
@@ -56,8 +64,13 @@ final class IslandWindow {
 
     /// Position the full-width strip on the notched screen (or main), flush to its top.
     /// Called on launch and whenever the display configuration changes.
+    ///
+    /// Retract-aware: `sync()` also runs this on Claude launch/quit and screen-parameter changes,
+    /// which can happen mid-fullscreen. A retracted pill must stay retracted, or an invisible
+    /// (alpha-0) panel would be parked back over the fullscreen app until the next show().
     func relayout() {
-        guard let frame = restingFrame() else { return }
+        guard var frame = restingFrame() else { return }
+        if isRetracted { frame.origin.y += slideDistance }
         panel.setFrame(frame, display: true)
         hosting.frame = NSRect(origin: .zero, size: frame.size)
         updateInteractiveZone()
@@ -79,15 +92,22 @@ final class IslandWindow {
     /// collapsed pill + Clawd; paired with a fade so the retract reads cleanly.
     private let slideDistance: CGFloat = 110
 
+    /// True while the pill is retracted for fullscreen: slid up, alpha 0, but still in the window
+    /// list (see hide() for why it's never ordered out). relayout() consults this.
+    private(set) var isRetracted = false
+
     /// Slide the pill down out of the notch into its resting spot. Used when leaving fullscreen or
     /// turning the option off.
     func show() {
+        isRetracted = false
+        hosting.interactionEnabled = true                      // interactive again
         guard let rest = restingFrame() else { panel.orderFrontRegardless(); return }
-        if panel.isVisible { panel.setFrame(rest, display: true); panel.alphaValue = 1; return }
-        var start = rest; start.origin.y += slideDistance      // begin retracted above the edge
-        panel.setFrame(start, display: false)
-        panel.alphaValue = 0
-        panel.orderFrontRegardless()
+        if !panel.isVisible {                                  // first appearance: start retracted
+            var start = rest; start.origin.y += slideDistance
+            panel.setFrame(start, display: false)
+            panel.alphaValue = 0
+            panel.orderFrontRegardless()
+        }
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.28
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
@@ -96,21 +116,26 @@ final class IslandWindow {
         }
     }
 
-    /// Slide the pill up into the notch and fade it out, then actually order it out. Reads as the
-    /// island tucking away as the app goes fullscreen, rather than blinking off.
+    /// Slide the pill up into the notch and fade it out. The panel is NOT ordered out — removing it
+    /// from the window list while a fullscreen Space is active makes macOS drop its
+    /// `.canJoinAllSpaces` membership, pinning it to one Space afterward. Staying in the list (just
+    /// transparent + slid up) keeps it on every Space.
+    ///
+    /// While retracted, interaction is additionally gated off at the view level (see
+    /// PassthroughHostingView.interactionEnabled) so a hidden pill can never claim a click even if
+    /// something repositions it on-screen. Window-server click-through of transparent pixels stays
+    /// untouched — `ignoresMouseEvents` must never be set explicitly (see the note on the view).
     func hide() {
         model.isExpanded = false                               // never slide away mid-expand
-        guard let rest = restingFrame(), panel.isVisible else { panel.orderOut(nil); return }
+        isRetracted = true
+        hosting.interactionEnabled = false                     // a hidden pill must never eat clicks
+        guard let rest = restingFrame() else { return }
         var end = rest; end.origin.y += slideDistance
-        NSAnimationContext.runAnimationGroup { [self] ctx in
+        NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.28
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
             panel.animator().setFrame(end, display: true)
             panel.animator().alphaValue = 0
-        } completionHandler: { [self] in
-            panel.orderOut(nil)
-            panel.setFrame(rest, display: false)               // reset for the next show / relayout
-            panel.alphaValue = 1
         }
     }
 }

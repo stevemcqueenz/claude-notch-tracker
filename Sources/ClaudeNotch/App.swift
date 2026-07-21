@@ -28,16 +28,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         monitor.start { [weak self] in self?.sync() }   // fires on display / Claude changes
         observeExpansion()
         sync()
-        // Hide-in-fullscreen: react to Space changes, re-arm on the toggle, and poll (for
-        // in-window fullscreen like browser video, which doesn't switch Spaces).
+        // Hide-in-fullscreen: Space changes are the primary trigger; the poll catches the
+        // enter-fullscreen transition early (before the Space switch lands) and any missed
+        // notification. Re-armed whenever the toggle changes.
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(fullscreenMaybeChanged),
             name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(appActivated(_:)),
+            name: NSWorkspace.didActivateApplicationNotification, object: nil)
         observeHideInFullscreen()
         refreshFullscreenTimer()
     }
 
     @objc private func fullscreenMaybeChanged() { updateVisibility() }
+
+    /// Pre-hide on app activation. Cmd+Tab / Dock clicks fire this *before* the Space switch
+    /// starts; the pill rides onto every Space, so waiting for the switch to land means it shows
+    /// up over the fullscreen app and then has to disappear — a visible blink. When every window
+    /// of the activated app lives on a fullscreen Space, landing there is inevitable: tuck the
+    /// pill away now and it never appears over the fullscreen app at all. Mixed apps (fullscreen
+    /// window plus desktop windows) are left alone, since activation might land on a desktop
+    /// window; the settled-state machinery covers them after the switch.
+    @objc private func appActivated(_ note: Notification) {
+        guard model.hideInFullscreen, !islandHidden,
+              let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+              let screen = NSScreen.island,
+              SpaceInfo.appLivesOnlyOnFullscreenSpaces(pid: app.processIdentifier, on: screen)
+        else { return }
+        setHidden(true)
+    }
 
     /// The island should hide only when the user opted in *and* a fullscreen app owns the island's
     /// screen. Acts only on a change, so it's cheap to call often.
@@ -53,65 +74,61 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if hide { window.hide() } else { window.show() }
     }
 
-    /// True when the frontmost app is running fullscreen on the island's display.
+    /// True when a fullscreen app owns the island's display.
     ///
-    /// Window bounds alone can't tell fullscreen from a maximized/zoomed window — on a notched Mac
-    /// a settled fullscreen window sits at the same `y=menuBarHeight, height=contentHeight` a zoomed
-    /// window does. The real signal is *Space isolation*: a fullscreen app lives on its own Space, so
-    /// no **other** app's window is on-screen behind it. So: the frontmost app fills the whole content
-    /// area, and no other app has a large window on this display. Permission-free (no Accessibility).
+    /// Asks the WindowServer whether the display's active Space is a fullscreen Space (via the
+    /// private SkyLight API in `SpaceInfo`). That's a definitive signal, unlike sniffing window
+    /// bounds, which can't tell native fullscreen from a maximized/zoomed window and breaks on
+    /// notch geometry. Permission-free (no Accessibility or Screen Recording).
+    ///
+    /// The transition check is OR'd in as an early hint: it fires at the *start* of the
+    /// enter-fullscreen zoom (before the Space switch lands), so the pill tucks away as the
+    /// transition begins rather than after it settles. SpaceInfo remains the authority for the
+    /// settled state and for showing the pill again.
     private static func fullscreenPresent() -> Bool {
-        guard let screen = NSScreen.island,
-              let num = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+        guard let screen = NSScreen.island else { return false }
+        return SpaceInfo.fullscreenSpaceActive(on: screen)
+            || fullscreenTransitionUnderway(on: screen)
+    }
+
+    /// Early hint: during the enter-fullscreen zoom the front app's window covers the ENTIRE
+    /// display — including the notch / menu-bar strip. A maximized window never does that (it
+    /// starts below the strip), so this can't fire on merely-zoomed windows. It only accelerates
+    /// the hide; it's never needed for correctness.
+    private static func fullscreenTransitionUnderway(on screen: NSScreen) -> Bool {
+        guard let num = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber,
+              let front = NSWorkspace.shared.frontmostApplication
         else { return false }
         let bounds = CGDisplayBounds(CGDirectDisplayID(num.uint32Value))   // global, top-left origin
         guard let list = CGWindowListCopyWindowInfo(
             [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
         else { return false }
-        let mine = Int(ProcessInfo.processInfo.processIdentifier)
-        let frontPID = NSWorkspace.shared.frontmostApplication.map { Int($0.processIdentifier) }
-        // The menu bar occupies the top strip; a fullscreen window covers the rest (the whole
-        // display minus that strip). Anything within ~40pt of full height counts as "fills content".
-        let contentFillMinHeight = bounds.height - 40
-
-        var frontFillsContent = false        // settled fullscreen: fills below-menu-bar content area
-        var frontCoversDisplay = false       // transition / notch-covering: window reaches y=0 too
-        var otherAppHasLargeWindow = false
+        let frontPID = Int(front.processIdentifier)
         for w in list {
             guard (w[kCGWindowLayer as String] as? Int) == 0,               // ordinary app window
-                  let pid = w[kCGWindowOwnerPID as String] as? Int, pid != mine,   // not our own panel
+                  (w[kCGWindowOwnerPID as String] as? Int) == frontPID,
                   let bd = w[kCGWindowBounds as String],
-                  let r = CGRect(dictionaryRepresentation: bd as! CFDictionary),
-                  r.intersects(bounds)                                       // on the island's display
+                  let r = CGRect(dictionaryRepresentation: bd as! CFDictionary)
             else { continue }
-            let fullWidth = abs(r.width - bounds.width) < 4 && abs(r.minX - bounds.minX) < 4
-            // Fills the content area (top strip may be the menu bar): settled-fullscreen shape.
-            let fillsContent = fullWidth && r.minY - bounds.minY < 40 && r.height >= contentFillMinHeight
-            // Reaches the very top and covers the whole display — only happens in real fullscreen
-            // (incl. the transition frame), never a maximized window (those start below the notch).
-            let coversDisplay = fullWidth && r.minY - bounds.minY < 4 && r.height >= bounds.height - 4
-            if pid == frontPID {
-                if fillsContent { frontFillsContent = true }
-                if coversDisplay { frontCoversDisplay = true }
-            } else if r.width > bounds.width * 0.5 {   // some *other* app has a substantial window
-                otherAppHasLargeWindow = true
+            if abs(r.width - bounds.width) < 4, abs(r.minX - bounds.minX) < 4,
+               r.minY - bounds.minY < 4, r.height >= bounds.height - 4 {
+                return true
             }
         }
-        // Covers-the-whole-display fires immediately on the transition (before other windows clear);
-        // fills-content + Space-isolation is the settled state once the fullscreen Space owns it.
-        return frontCoversDisplay || (frontFillsContent && !otherAppHasLargeWindow)
+        return false
     }
 
-    /// Run a light poll only while the option is on (catches fullscreen that doesn't switch Spaces).
+    /// Arm a brisk poll only while the option is on. The Space-change notification is the
+    /// authoritative trigger; the poll exists to catch the enter-transition early (the hint above
+    /// needs sub-transition sampling to be useful) and to cover any missed notification.
     private func refreshFullscreenTimer() {
         fullscreenTimer?.invalidate()
         fullscreenTimer = nil
         if model.hideInFullscreen {
-            // Poll briskly (only while the option is on) so entering/leaving fullscreen is caught
-            // near-instantly even when no Space-change notification fires (e.g. in-window video).
-            fullscreenTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            fullscreenTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
                 Task { @MainActor in self?.updateVisibility() }
             }
+            fullscreenTimer?.tolerance = 0.05
         }
         updateVisibility()
     }
