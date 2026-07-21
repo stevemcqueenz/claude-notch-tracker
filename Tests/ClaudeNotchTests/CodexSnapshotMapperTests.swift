@@ -75,6 +75,43 @@ import Testing
         #expect(snapshot.statusMessage == nil)
     }
 
+    @Test func keepsTopLevelSnapshotAndAppendsDistinctBuckets() throws {
+        // Mirrors upstream app_server_rate_limit_snapshots: the top-level snapshot survives even
+        // when rateLimitsByLimitId repeats it, and distinct buckets are appended after it. Also
+        // exercises the ±5% duration tolerance (299 minutes must still label as 5-Hour).
+        let rateLimits = try decode(CodexRateLimitsResponse.self, json: """
+        {
+          "rateLimits": {
+            "limitId": "codex",
+            "limitName": "Codex",
+            "primary": {"usedPercent": 42, "windowDurationMins": 300, "resetsAt": 1784556000},
+            "secondary": {"usedPercent": 70, "windowDurationMins": 10080, "resetsAt": 1785160800}
+          },
+          "rateLimitsByLimitId": {
+            "codex": {
+              "limitId": "codex",
+              "limitName": "Codex",
+              "primary": {"usedPercent": 42, "windowDurationMins": 300, "resetsAt": 1784556000},
+              "secondary": {"usedPercent": 70, "windowDurationMins": 10080, "resetsAt": 1785160800}
+            },
+            "codex-mini": {
+              "limitId": "codex-mini",
+              "limitName": "Codex Mini",
+              "primary": {"usedPercent": 5, "windowDurationMins": 299, "resetsAt": 1784556000}
+            }
+          }
+        }
+        """)
+
+        let snapshot = CodexSnapshotMapper.make(
+            account: nil, rateLimits: rateLimits, usage: nil, threads: nil, now: Date()
+        )
+
+        #expect(snapshot.limits.map(\.label) ==
+            ["Codex · 5-Hour", "Codex · 7-Day", "Codex Mini · 5-Hour"])
+        #expect(snapshot.limits.map(\.usedFraction) == [0.42, 0.70, 0.05])
+    }
+
     @Test func fillsSpareTilesWithLifetimeStatsAndFlagsSpendControl() throws {
         // Shaped like a real account with one 30-day window, no secondary, and a lagging daily
         // feed — the case that otherwise renders a sparse four-tile page.
@@ -109,7 +146,7 @@ import Testing
             account: nil, rateLimits: rateLimits, usage: usage, threads: nil, now: Date()
         )
 
-        #expect(snapshot.limits.map(\.label) == ["30-Day"])
+        #expect(snapshot.limits.map(\.label) == ["Monthly"])
         #expect(snapshot.stats.first(where: { $0.id == "peak-day" })?.value == Fmt.tokens(501_548_755))
         #expect(snapshot.stats.first(where: { $0.id == "longest-task" })?.value == "15h 14m")
         let streak = snapshot.stats.first(where: { $0.id == "streak" })

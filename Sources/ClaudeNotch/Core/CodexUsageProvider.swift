@@ -202,11 +202,17 @@ enum CodexSnapshotMapper {
     }
 
     private static func makeLimits(_ response: CodexRateLimitsResponse) -> [UsageLimitMetric] {
-        let buckets: [(String, CodexRateLimitsResponse.Snapshot)]
-        if let byID = response.rateLimitsByLimitId, !byID.isEmpty {
-            buckets = byID.sorted { $0.key < $1.key }
-        } else {
-            buckets = [(response.rateLimits.limitId ?? "codex", response.rateLimits)]
+        // Mirrors official Codex snapshot handling (tui/src/app_server_session.rs): the top-level
+        // snapshot always comes first, and by-id entries are appended only when they don't
+        // duplicate it (matched by map key or the snapshot's own limitId). The previous behavior
+        // dropped the top-level snapshot whenever the map existed, which would lose windows the
+        // map doesn't repeat.
+        let primary = response.rateLimits
+        let primaryID = primary.limitId
+        var buckets: [(String, CodexRateLimitsResponse.Snapshot)] = [(primaryID ?? "codex", primary)]
+        for (key, snapshot) in (response.rateLimitsByLimitId ?? [:]).sorted(by: { $0.key < $1.key }) {
+            let duplicatesPrimary = primaryID.map { $0 == key || $0 == snapshot.limitId } ?? false
+            if !duplicatesPrimary { buckets.append((key, snapshot)) }
         }
 
         let usesBucketPrefix = buckets.count > 1
@@ -241,13 +247,21 @@ enum CodexSnapshotMapper {
 
     private static func durationLabel(_ minutes: Int?) -> String {
         guard let minutes else { return "Limit" }
-        return switch minutes {
-        case 300: "5-Hour"
-        case 10_080: "7-Day"
-        case let value where value % 1_440 == 0: "\(value / 1_440)-Day"
-        case let value where value % 60 == 0: "\(value / 60)-Hour"
-        default: "\(minutes)-Min"
+        // Official Codex matches window durations within ±5% of the canonical windows
+        // (tui/src/chatwidget/rate_limits.rs, is_approximate_window), so a 299-minute window
+        // still reads as the 5-hour limit instead of "299-Min".
+        func approximately(_ expected: Int) -> Bool {
+            let m = Double(minutes), e = Double(expected)
+            return m >= e * 0.95 && m <= e * 1.05
         }
+        if approximately(300) { return "5-Hour" }
+        if approximately(1_440) { return "Daily" }
+        if approximately(10_080) { return "7-Day" }
+        if approximately(43_200) { return "Monthly" }
+        if approximately(525_600) { return "Annual" }
+        if minutes % 1_440 == 0 { return "\(minutes / 1_440)-Day" }
+        if minutes % 60 == 0 { return "\(minutes / 60)-Hour" }
+        return "\(minutes)-Min"
     }
 
     /// "15h 15m" / "42m" for the longest-running task turn.
