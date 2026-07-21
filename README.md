@@ -1,8 +1,8 @@
 <div align="center">
 
-# 🦀 Claude Notch Usage Companion
+# 🦀 Claude & Codex Notch Usage Companion
 
-**Your live Claude usage in your Mac's notch, with optional Codex tracking: limits, resets, tokens, and cost.**
+**Live Claude and Codex usage in your Mac's notch: limits, resets, tokens, and cost.**
 
 <img src="docs/demo.gif" width="640" alt="Claude Notch: click to expand, swipe between the limits and detail pages, and tap to switch active sessions or all-time" />
 
@@ -50,9 +50,9 @@ your spend and sessions sit behind. Click away and it glides shut. No Dock icon,
 - **Real limit tiles.** Your **5-hour** session, **7-day** weekly, *and* **Fable's own weekly
   limit**. Fable is metered separately, so you get the same three bars the Claude desktop app
   shows, each with a reset countdown and colour-coded urgency.
-- **Claude and Codex providers.** Pick your provider from the right-click menu. Codex limits,
-  credits, plan, token totals, and recent tasks come from the official local `codex app-server`
-  interface.
+- **Claude and Codex providers.** Click the left icon to switch providers. Codex limits, credits,
+  plan, token totals, lifetime stats, and recent tasks come from the official local
+  `codex app-server` interface.
 - **Two pages, one swipe.** Limits up front. Swipe (or tap the dots) to a local detail page with
   today versus all-time spend, plus your live sessions.
 - **Named sessions.** Your actual **conversation titles** from the sidebar, with today's spend per
@@ -64,7 +64,8 @@ your spend and sessions sit behind. Click away and it glides shut. No Dock icon,
 - **Hide in full screen.** An opt-in toggle tucks the island up into the notch while a full-screen
   app owns the display, so movies and video stay uninterrupted, then slides it back on exit.
 - **Clawd, the walking crab.** He quickens as you approach a limit and freezes when you're out.
-  Prefer a mono crab or the Claude Spark? Click to swap.
+  Prefer a mono crab or the Claude Spark? Pick your look from the right-click Icon menu. On Codex,
+  the Codex mark floats in his place.
 - **Local-first and private.** Claude Notch reads local provider state and talks only to the
   corresponding first-party service. Local cost and token figures are clearly labelled `local`.
 - **Zero fuss.** It draws its own notch on non-notch Macs, auto-updates itself, and lives entirely
@@ -123,8 +124,8 @@ Command Line Tools.
 - **Click** the % or ring to expand, and **click away** to collapse.
 - **Swipe** left or right (or tap the dots) to switch between the limits page and the detail page.
 - **Tap the sessions block** to flip between today's active sessions and all-time top projects.
-- **Click Clawd** to cycle the icon (Clawd, then mono, then Spark).
-- **Right-click** the island for Provider (Claude or Codex), Icon, Pause, Animate icon, Hide in
+- **Click the left icon** to switch between Claude and Codex.
+- **Right-click** the island for Provider, Icon (Clawd, mono, Spark), Pause, Animate icon, Hide in
   full screen, Launch at Login, Check for Updates, and Quit.
 
 ## Credits
