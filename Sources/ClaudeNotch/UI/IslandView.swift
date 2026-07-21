@@ -41,7 +41,9 @@ struct IslandView: View {
     private var closedWidth: CGFloat { wing + gap + wing + edgeInset * 2 }
     private var provider: ProviderUsageSnapshot { model.activeProviderSnapshot }
     private var used: Double { provider.primaryUsage ?? 0 }
-    private var codexIcon: NSImage? {
+    /// Loaded once — this is read on every render of the closed row, and hitting the disk per
+    /// frame during animations would be pure waste. MainActor because NSImage isn't Sendable.
+    @MainActor private static let codexIcon: NSImage? = {
         if let resourcesURL = Bundle.main.resourceURL,
            let packagedBundle = Bundle(
                url: resourcesURL.appendingPathComponent("ClaudeNotch_ClaudeNotch.bundle")
@@ -55,7 +57,7 @@ struct IslandView: View {
             return nil
         }
         return NSImage(contentsOf: url)
-    }
+    }()
 
     var body: some View {
         let shape = NotchShape(topRadius: 8,
@@ -158,7 +160,7 @@ struct IslandView: View {
             AvatarView(style: model.avatarStyle,
                        active: model.animateIcon && !model.isPaused && !model.isAtLimit,
                        urgency: model.iconUrgency)
-        } else if let icon = codexIcon {
+        } else if let icon = Self.codexIcon {
             CodexIconView(
                 image: icon,
                 active: model.animateIcon && !model.isPaused && !model.isAtLimit,
