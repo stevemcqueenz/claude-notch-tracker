@@ -82,6 +82,51 @@ import Testing
         #expect(!SpaceInfo.isFullscreen(displays: [a, b], wantUUID: nil, isMainDisplay: false))
     }
 
+    // MARK: pre-hide on activation (spacesAreAllFullscreen)
+
+    @Test func allFullscreenSpacesOnIslandPreHides() {
+        let d = display(identifier: uuid, current: ["type": 0],
+                        spaces: [["ManagedSpaceID": 1, "type": 0],
+                                 ["ManagedSpaceID": 994, "type": 4]])
+        #expect(SpaceInfo.spacesAreAllFullscreen(displays: [d], spaceIDs: [994],
+                                                 wantUUID: uuid, isMainDisplay: true))
+    }
+
+    @Test func mixedDesktopAndFullscreenDoesNotPreHide() {
+        // The live Mail case: windows on a desktop Space and a fullscreen Space at once.
+        let d = display(identifier: uuid, current: ["type": 0],
+                        spaces: [["ManagedSpaceID": 1, "type": 0],
+                                 ["ManagedSpaceID": 994, "type": 4]])
+        #expect(!SpaceInfo.spacesAreAllFullscreen(displays: [d], spaceIDs: [1, 994],
+                                                  wantUUID: uuid, isMainDisplay: true))
+    }
+
+    @Test func fullscreenOnOtherDisplayOnlyDoesNotPreHide() {
+        // Activation would switch the OTHER display's Space; the island display is unaffected.
+        let island = display(identifier: uuid, current: ["type": 0],
+                             spaces: [["ManagedSpaceID": 1, "type": 0]])
+        let other = display(identifier: "B", current: ["type": 0],
+                            spaces: [["ManagedSpaceID": 700, "type": 4]])
+        #expect(!SpaceInfo.spacesAreAllFullscreen(displays: [island, other], spaceIDs: [700],
+                                                  wantUUID: uuid, isMainDisplay: true))
+    }
+
+    @Test func unresolvedOrEmptySpaceIDsFailSafe() {
+        let d = display(identifier: uuid, current: ["type": 0],
+                        spaces: [["ManagedSpaceID": 994, "type": 4]])
+        #expect(!SpaceInfo.spacesAreAllFullscreen(displays: [d], spaceIDs: [994, 12345],   // 12345 unknown
+                                                  wantUUID: uuid, isMainDisplay: true))
+        #expect(!SpaceInfo.spacesAreAllFullscreen(displays: [d], spaceIDs: [],
+                                                  wantUUID: uuid, isMainDisplay: true))
+    }
+
+    @Test func resolvesSpaceIDThroughID64() {
+        let d = display(identifier: uuid, current: ["type": 0],
+                        spaces: [["id64": 994, "type": 4]])
+        #expect(SpaceInfo.spacesAreAllFullscreen(displays: [d], spaceIDs: [994],
+                                                 wantUUID: uuid, isMainDisplay: true))
+    }
+
     // MARK: junk payloads
 
     @Test func junkPayloadsFailSafe() {

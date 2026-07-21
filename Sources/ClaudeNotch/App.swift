@@ -34,11 +34,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(fullscreenMaybeChanged),
             name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(appActivated(_:)),
+            name: NSWorkspace.didActivateApplicationNotification, object: nil)
         observeHideInFullscreen()
         refreshFullscreenTimer()
     }
 
     @objc private func fullscreenMaybeChanged() { updateVisibility() }
+
+    /// Pre-hide on app activation. Cmd+Tab / Dock clicks fire this *before* the Space switch
+    /// starts; the pill rides onto every Space, so waiting for the switch to land means it shows
+    /// up over the fullscreen app and then has to disappear — a visible blink. When every window
+    /// of the activated app lives on a fullscreen Space, landing there is inevitable: tuck the
+    /// pill away now and it never appears over the fullscreen app at all. Mixed apps (fullscreen
+    /// window plus desktop windows) are left alone, since activation might land on a desktop
+    /// window; the settled-state machinery covers them after the switch.
+    @objc private func appActivated(_ note: Notification) {
+        guard model.hideInFullscreen, !islandHidden,
+              let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+              let screen = NSScreen.island,
+              SpaceInfo.appLivesOnlyOnFullscreenSpaces(pid: app.processIdentifier, on: screen)
+        else { return }
+        setHidden(true)
+    }
 
     /// The island should hide only when the user opted in *and* a fullscreen app owns the island's
     /// screen. Acts only on a change, so it's cheap to call often.
