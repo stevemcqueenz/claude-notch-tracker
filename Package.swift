@@ -11,6 +11,10 @@ let package = Package(
         .executableTarget(
             name: "ClaudeNotch",
             dependencies: [.product(name: "Sparkle", package: "Sparkle")],
+            resources: [
+                .copy("Resources/codex.svg"),
+                .copy("Resources/codex.png"),
+            ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(

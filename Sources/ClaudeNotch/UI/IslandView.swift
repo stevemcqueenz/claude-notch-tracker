@@ -41,6 +41,12 @@ struct IslandView: View {
     private var closedWidth: CGFloat { wing + gap + wing + edgeInset * 2 }
     private var provider: ProviderUsageSnapshot { model.activeProviderSnapshot }
     private var used: Double { provider.primaryUsage ?? 0 }
+    private var codexIcon: NSImage? {
+        guard let url = Bundle.module.url(forResource: "codex", withExtension: "png"),
+              let image = NSImage(contentsOf: url) else { return nil }
+        image.isTemplate = true
+        return image
+    }
 
     var body: some View {
         let shape = NotchShape(topRadius: 8,
@@ -141,6 +147,12 @@ struct IslandView: View {
             AvatarView(style: model.avatarStyle,
                        active: model.animateIcon && !model.isPaused && !model.isAtLimit,
                        urgency: model.iconUrgency)
+        } else if let icon = codexIcon {
+            Image(nsImage: icon)
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(.white.opacity(model.isPaused ? 0.45 : 0.9))
         } else if let symbol = NSImage(
             systemSymbolName: model.selectedProvider.systemImage,
             accessibilityDescription: model.selectedProvider.displayName
