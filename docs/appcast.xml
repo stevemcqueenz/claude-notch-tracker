@@ -3,6 +3,27 @@
     <channel>
         <title>Claude Notch</title>
         <item>
+            <title>0.2.0</title>
+            <description><![CDATA[
+                <h2>Hide in full screen, rebuilt</h2>
+                <p>The full-screen detection now asks macOS directly whether a full-screen Space is active, instead of guessing from window geometry. Contributed by <a href="https://github.com/hexxt-git">@hexxt-git</a>, with additional hardening on top.</p>
+                <ul>
+                    <li>Reliable on notched Macs; a maximized window no longer hides the island by mistake</li>
+                    <li>Keeps working across Spaces (it previously could get pinned to one Space)</li>
+                    <li>Tucks away <i>before</i> you switch to a full-screen app, so it no longer pops up over movies mid-switch</li>
+                    <li>Still tucks right at the start of the full-screen transition</li>
+                    <li>Crash-safe system calls and a fixture-tested parser under the hood</li>
+                </ul>
+                <p>Thanks to <b>hexxt-git</b> for the report and the fix.</p>
+            ]]></description>
+            <pubDate>Tue, 21 Jul 2026 12:21:47 +0200</pubDate>
+            <sparkle:version>0.2.0</sparkle:version>
+            <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/stevemcqueenz/claude-notch-tracker/releases/download/v0.2.0/ClaudeNotch.zip" length="1530608" type="application/octet-stream" sparkle:edSignature="dfXrE4ReVF69CnsBn0salsPzMvHQfvelvt+immV1daqTMtkakBVkXazgKN74b8PYFsg/mENluINS1foAkgtuAQ=="/>
+        </item>
+        <item>
             <title>0.1.9</title>
             <description><![CDATA[
                 <h2>Hide in full screen</h2>
