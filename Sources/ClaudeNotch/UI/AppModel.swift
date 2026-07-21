@@ -248,6 +248,12 @@ final class AppModel {
         case .codex: fetchCodexUsage()
         }
     }
+    /// Advance to the next provider (icon click) — with two providers this is a toggle.
+    func cycleProvider() {
+        let providers = UsageProviderID.allCases
+        guard let index = providers.firstIndex(of: selectedProvider) else { return }
+        selectProvider(providers[(index + 1) % providers.count])
+    }
     func cycleAvatar() { setAvatar(avatarStyle.next) }
     func setAvatar(_ s: AvatarStyle) { avatarStyle = s; AvatarStyle.selected = s }
     func toggleAnimateIcon() {

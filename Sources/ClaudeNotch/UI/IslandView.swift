@@ -133,10 +133,10 @@ struct IslandView: View {
                 .frame(width: iconSize, height: iconSize)
                 .frame(width: wing, height: closedH)
                 .contentShape(Rectangle())
-                // Tap keeps its long-standing meaning: cycle Clawd's look. Provider switching
-                // lives in the right-click menu only, so existing muscle memory stays intact.
-                .onTapGesture { if model.selectedProvider == .claude { model.cycleAvatar() } }
-                .help(model.selectedProvider == .claude ? "Click to change the icon" : "Codex")
+                // Tap switches provider (Claude ⇄ Codex); the Claude icon style is picked from
+                // the right-click Icon menu.
+                .onTapGesture { model.cycleProvider() }
+                .help("Click to switch provider")
 
             Color.clear.frame(width: gap, height: closedH)
 
