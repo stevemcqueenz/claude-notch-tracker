@@ -42,10 +42,19 @@ struct IslandView: View {
     private var provider: ProviderUsageSnapshot { model.activeProviderSnapshot }
     private var used: Double { provider.primaryUsage ?? 0 }
     private var codexIcon: NSImage? {
-        guard let url = Bundle.module.url(forResource: "codex", withExtension: "png"),
-              let image = NSImage(contentsOf: url) else { return nil }
-        image.isTemplate = true
-        return image
+        if let resourcesURL = Bundle.main.resourceURL,
+           let packagedBundle = Bundle(
+               url: resourcesURL.appendingPathComponent("ClaudeNotch_ClaudeNotch.bundle")
+           ),
+           let url = packagedBundle.url(forResource: "codex", withExtension: "png"),
+           let image = NSImage(contentsOf: url) {
+            return image
+        }
+
+        guard let url = Bundle.module.url(forResource: "codex", withExtension: "png") else {
+            return nil
+        }
+        return NSImage(contentsOf: url)
     }
 
     var body: some View {
@@ -148,11 +157,12 @@ struct IslandView: View {
                        active: model.animateIcon && !model.isPaused && !model.isAtLimit,
                        urgency: model.iconUrgency)
         } else if let icon = codexIcon {
-            Image(nsImage: icon)
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .foregroundStyle(.white.opacity(model.isPaused ? 0.45 : 0.9))
+            CodexIconView(
+                image: icon,
+                active: model.animateIcon && !model.isPaused && !model.isAtLimit,
+                urgency: model.iconUrgency
+            )
+            .opacity(model.isPaused ? 0.45 : 0.9)
         } else if let symbol = NSImage(
             systemSymbolName: model.selectedProvider.systemImage,
             accessibilityDescription: model.selectedProvider.displayName

@@ -38,6 +38,11 @@ cp "$BIN" "$APPDIR/Contents/MacOS/ClaudeNotch"
 cp "$ROOT/Resources/Info.plist" "$APPDIR/Contents/Info.plist"
 cp "$ROOT/Resources/AppIcon.icns" "$APPDIR/Contents/Resources/AppIcon.icns"
 
+# Preserve SwiftPM's resource bundle inside the conventional app resources directory.
+RESOURCE_BUNDLE="$(find "$ROOT/.build" -path "*/release/ClaudeNotch_ClaudeNotch.bundle" -type d 2>/dev/null | head -1)"
+[ -d "$RESOURCE_BUNDLE" ] || { echo "✗ ClaudeNotch resource bundle not found"; exit 1; }
+ditto "$RESOURCE_BUNDLE" "$APPDIR/Contents/Resources/ClaudeNotch_ClaudeNotch.bundle"
+
 # Embed Sparkle.framework (SwiftPM builds it as an xcframework) + let the binary find it.
 SPARKLE_FW="$(find "$ROOT/.build/artifacts" -path "*macos-arm64_x86_64/Sparkle.framework" -type d 2>/dev/null | head -1)"
 [ -d "$SPARKLE_FW" ] || { echo "✗ Sparkle.framework not found — run 'swift build' first"; exit 1; }
