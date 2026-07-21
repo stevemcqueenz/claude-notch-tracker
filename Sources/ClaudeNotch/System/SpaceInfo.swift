@@ -8,8 +8,11 @@ private typealias CGSConnectionID = UInt32
 @_silgen_name("CGSMainConnectionID")
 private func CGSMainConnectionID() -> CGSConnectionID
 
+// Follows the CF Copy rule (+1), and can return NULL when no WindowServer connection is available
+// (e.g. our session is inactive during fast user switching) — so take it as an optional Unmanaged
+// and retain explicitly instead of letting Swift assume a valid owned reference.
 @_silgen_name("CGSCopyManagedDisplaySpaces")
-private func CGSCopyManagedDisplaySpaces(_ cid: CGSConnectionID) -> CFArray
+private func CGSCopyManagedDisplaySpaces(_ cid: CGSConnectionID) -> Unmanaged<CFArray>?
 
 /// Space types reported by the WindowServer. A macOS-native fullscreen window lives on its own
 /// Space whose type is `fullscreen`; ordinary desktops are `user`.
@@ -25,27 +28,35 @@ enum SpaceInfo {
         guard let num = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
         else { return false }
         let displayID = CGDirectDisplayID(num.uint32Value)
-        let wantUUID = displayUUID(displayID)
-
-        guard let displays = CGSCopyManagedDisplaySpaces(CGSMainConnectionID()) as? [[String: Any]]
+        guard let displays = CGSCopyManagedDisplaySpaces(CGSMainConnectionID())?
+            .takeRetainedValue() as? [[String: Any]]
         else { return false }
+        return isFullscreen(displays: displays,
+                            wantUUID: displayUUID(displayID),
+                            isMainDisplay: displayID == CGMainDisplayID())
+    }
 
+    /// Pure payload walk, separated from the WindowServer call so fixture tests can exercise every
+    /// shape the private API is known to return. Fails safe to `false` on anything unexpected, so a
+    /// changed payload on a future macOS degrades to "island stays visible", never a wrong hide.
+    static func isFullscreen(displays: [[String: Any]], wantUUID: String?, isMainDisplay: Bool) -> Bool {
         // Match the island's display by UUID; fall back to the "Main" entry, or the sole entry when
         // "Displays have separate Spaces" is off (one combined entry covers everything).
-        let match = displays.first { ($0["Display Identifier"] as? String) == wantUUID }
-            ?? displays.first {
-                ($0["Display Identifier"] as? String) == "Main" && displayID == CGMainDisplayID()
-            }
+        let byUUID = wantUUID.flatMap { uuid in
+            displays.first { ($0["Display Identifier"] as? String) == uuid }
+        }
+        let match = byUUID
+            ?? (isMainDisplay ? displays.first { ($0["Display Identifier"] as? String) == "Main" } : nil)
             ?? (displays.count == 1 ? displays.first : nil)
 
         guard let display = match,
               let current = display["Current Space"] as? [String: Any] else { return false }
 
-        // "Current Space" carries only the space's identity (ManagedSpaceID / uuid); the `type` lives
-        // on the matching entry in "Spaces". Resolve it there. (Some macOS builds also inline `type`
-        // on "Current Space", so honor that first.)
+        // Some macOS builds inline `type` on "Current Space"; honor that first.
         if let type = current["type"] as? Int { return type == kCGSSpaceFullscreen }
 
+        // Otherwise "Current Space" carries only the space's identity (ManagedSpaceID / uuid); the
+        // `type` lives on the matching entry in "Spaces". Resolve it there.
         let currentID = current["ManagedSpaceID"] as? Int ?? current["id64"] as? Int
         let currentUUID = current["uuid"] as? String
         let spaces = display["Spaces"] as? [[String: Any]] ?? []
