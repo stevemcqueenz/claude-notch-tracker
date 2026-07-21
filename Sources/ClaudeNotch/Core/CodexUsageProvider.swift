@@ -2,20 +2,44 @@ import Foundation
 
 actor CodexUsageProvider {
     private let transport = CodexAppServerTransport()
+    /// The transport blocks on pipe reads behind NSCondition waits (worst case ~20s of timeouts),
+    /// so it runs on its own utility queue. It must never run on the cooperative pool — actors
+    /// execute there, and blocking a cooperative thread starves every other task in the app.
+    private static let transportQueue = DispatchQueue(label: "codex-app-server", qos: .utility)
 
-    func fetch() -> ProviderUsageSnapshot {
+    func fetch() async -> ProviderUsageSnapshot {
+        let transport = transport
+        return await withCheckedContinuation { continuation in
+            Self.transportQueue.async {
+                continuation.resume(returning: Self.snapshot(using: transport))
+            }
+        }
+    }
+
+    private static func snapshot(using transport: CodexAppServerTransport) -> ProviderUsageSnapshot {
         do {
             let exchange = try transport.fetch()
             let account = exchange.decode(CodexAccountResponse.self, id: 2)
             let rateLimits = exchange.decode(CodexRateLimitsResponse.self, id: 3)
             let usage = exchange.decode(CodexAccountUsageResponse.self, id: 4)
             let threads = exchange.decode(CodexThreadListResponse.self, id: 5)
+            // A result that arrived but no longer decodes means the app-server's schema moved.
+            // Surface that instead of silently dropping tiles, so a future Codex update shows a
+            // status line rather than a mysteriously empty island.
+            var errors = exchange.errors
+            let decodes: [(Int, Any?, String)] = [
+                (2, account, "account"), (3, rateLimits, "rate limits"),
+                (4, usage, "usage"), (5, threads, "tasks"),
+            ]
+            for (id, decoded, name) in decodes where exchange.hasResult(id) && decoded == nil {
+                errors[id] = "Codex \(name) response not recognized"
+            }
             return CodexSnapshotMapper.make(
                 account: account,
                 rateLimits: rateLimits,
                 usage: usage,
                 threads: threads,
-                errors: exchange.errors,
+                errors: errors,
                 now: Date()
             )
         } catch {
@@ -133,7 +157,9 @@ enum CodexSnapshotMapper {
         var message: String?
         if account?.account?.type == "apiKey", usage == nil {
             message = "Account usage requires ChatGPT sign-in"
-        } else if limits.isEmpty, usage == nil, !errors.isEmpty {
+        } else if !errors.isEmpty, limits.isEmpty || usage == nil {
+            // Surface the first problem whenever a whole section is missing — including partial
+            // failures, where limits render but usage silently didn't (or vice versa).
             message = errors.sorted { $0.key < $1.key }.first?.value
         }
 
@@ -239,6 +265,8 @@ private struct CodexRPCExchange: Sendable {
         guard let data = results[id] else { return nil }
         return try? JSONDecoder().decode(type, from: data)
     }
+
+    func hasResult(_ id: Int) -> Bool { results[id] != nil }
 }
 
 private struct CodexAppServerTransport: Sendable {
@@ -314,7 +342,13 @@ private struct CodexAppServerTransport: Sendable {
     private func cleanup(process: Process, input: Pipe, output: Pipe) {
         output.fileHandleForReading.readabilityHandler = nil
         try? input.fileHandleForWriting.close()
-        if process.isRunning { process.terminate() }
+        guard process.isRunning else { return }
+        process.terminate()
+        // Runs on the provider's dedicated queue, so a short bounded wait is fine: give SIGTERM
+        // up to ~1.5s to land, then SIGKILL. A wedged app-server must never accumulate — this is
+        // respawned on every poll.
+        for _ in 0..<15 where process.isRunning { usleep(100_000) }
+        if process.isRunning { kill(process.processIdentifier, SIGKILL) }
     }
 
     private func findExecutable() throws -> URL {
@@ -405,6 +439,10 @@ private final class CodexRPCCollector: @unchecked Sendable {
     private func consume(_ line: Data) {
         guard !line.isEmpty,
               let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
+              // Only RESPONSES complete our ids. Server-initiated requests carry both "id" and
+              // "method" in their own id-space — one colliding with ours would otherwise record
+              // an empty completion and silently blank that section.
+              object["method"] == nil,
               let id = (object["id"] as? NSNumber)?.intValue else { return }
         if let result = object["result"], JSONSerialization.isValidJSONObject(result),
            let data = try? JSONSerialization.data(withJSONObject: result) {
