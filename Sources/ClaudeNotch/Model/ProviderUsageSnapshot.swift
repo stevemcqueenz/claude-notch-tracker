@@ -16,7 +16,7 @@ enum UsageProviderID: String, CaseIterable, Identifiable, Sendable {
     var systemImage: String {
         switch self {
         case .claude: "sparkles"
-        case .codex: "chevron.left.forwardslash.chevron.right"
+        case .codex: "terminal.fill"
         }
     }
 }

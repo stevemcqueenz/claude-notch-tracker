@@ -141,9 +141,17 @@ struct IslandView: View {
             AvatarView(style: model.avatarStyle,
                        active: model.animateIcon && !model.isPaused && !model.isAtLimit,
                        urgency: model.iconUrgency)
+        } else if let symbol = NSImage(
+            systemSymbolName: model.selectedProvider.systemImage,
+            accessibilityDescription: model.selectedProvider.displayName
+        ) {
+            Image(nsImage: symbol)
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(.white.opacity(model.isPaused ? 0.45 : 0.9))
         } else {
-            Image(systemName: model.selectedProvider.systemImage)
-                .font(.system(size: 14, weight: .semibold))
+            Text("C")
+                .font(.system(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(.white.opacity(model.isPaused ? 0.45 : 0.9))
         }
     }
