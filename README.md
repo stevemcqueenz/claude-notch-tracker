@@ -39,11 +39,26 @@ your spend and sessions sit behind. Click away and it glides shut. No Dock icon,
   <sub><b>All-time top projects</b>: tap the ⇄ chip to switch</sub>
 </td>
 <td align="center" width="50%">
-  <img src="docs/settings.png" width="340" alt="Right-click settings menu: icon, pause, hide in full screen, launch at login, updates" /><br/>
+  <img src="docs/settings.png" width="340" alt="Right-click settings menu: provider, icon, pause, hide in full screen, launch at login, updates" /><br/>
   <sub><b>Settings</b>: right-click the island</sub>
 </td>
 </tr>
+<tr>
+<td align="center" width="50%">
+  <img src="docs/codex-limits.png" width="340" alt="Codex limits page: weekly window, tokens, credits, plan, peak day, longest task" /><br/>
+  <sub><b>Codex limits</b>: windows, credits, plan + lifetime stats</sub>
+</td>
+<td align="center" width="50%">
+  <img src="docs/codex-tasks.png" width="340" alt="Codex detail page: account token totals and recent tasks" /><br/>
+  <sub><b>Codex tasks</b>: account totals + recent tasks</sub>
+</td>
+</tr>
 </table>
+
+<div align="center">
+  <img src="docs/switch.gif" width="640" alt="One click on the left icon switches the island between Claude and Codex, collapsed or expanded" /><br/>
+  <sub><b>One click switches providers</b>: Claude ⇄ Codex, even while expanded</sub>
+</div>
 
 ## Features
 
