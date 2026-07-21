@@ -95,7 +95,16 @@ final class AppModel {
     }
 
     /// How urgent the icon should look (0…1) — drives Clawd's walk speed.
-    var iconUrgency: Double { activeProviderSnapshot.maximumUsage }
+    ///
+    /// Claude deliberately uses only the 5-hour and 7-day limits, as before multi-provider: the
+    /// Fable weekly limit is a per-model cap, and a maxed Fable would otherwise freeze Clawd at
+    /// "out of budget" while the account still has plenty of session/weekly headroom.
+    var iconUrgency: Double {
+        switch selectedProvider {
+        case .claude: max(claudeSessionUsage ?? 0, weeklyUsage ?? 0)
+        case .codex: codexSnapshot.maximumUsage
+        }
+    }
 
     /// A limit (5-hour or 7-day) is used up — there's nothing left to spend, so Clawd stops
     /// walking and stands still rather than sprinting at max speed.

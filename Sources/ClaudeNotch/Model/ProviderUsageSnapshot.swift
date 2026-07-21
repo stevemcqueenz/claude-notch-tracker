@@ -67,8 +67,11 @@ struct ProviderUsageSnapshot: Equatable, Sendable {
     var fetchedAt: Date?
     var statusMessage: String?
 
+    /// The headline fraction for the collapsed pill: the FIRST limit's value, nil when that limit
+    /// has no value yet. Deliberately not "first non-nil" — falling through to a later limit would
+    /// silently show, say, a weekly number where the session number belongs, unlabeled.
     var primaryUsage: Double? {
-        limits.compactMap(\.usedFraction).first
+        limits.first?.usedFraction
     }
 
     var maximumUsage: Double {
