@@ -1,8 +1,8 @@
 <div align="center">
 
-# 🦀 Claude + Codex Notch Usage Companion
+# 🦀 Claude Notch Usage Companion
 
-**Live Claude and Codex usage in your Mac's notch: limits, resets, tokens, and cost.**
+**Your live Claude usage in your Mac's notch, with optional Codex tracking: limits, resets, tokens, and cost.**
 
 <img src="docs/demo.gif" width="640" alt="Claude Notch: click to expand, swipe between the limits and detail pages, and tap to switch active sessions or all-time" />
 
@@ -50,8 +50,9 @@ your spend and sessions sit behind. Click away and it glides shut. No Dock icon,
 - **Real limit tiles.** Your **5-hour** session, **7-day** weekly, *and* **Fable's own weekly
   limit**. Fable is metered separately, so you get the same three bars the Claude desktop app
   shows, each with a reset countdown and colour-coded urgency.
-- **Claude and Codex providers.** Click the left icon to switch providers. Codex limits, credits,
-  plan, token totals, and recent tasks come from the official local `codex app-server` interface.
+- **Claude and Codex providers.** Pick your provider from the right-click menu. Codex limits,
+  credits, plan, token totals, and recent tasks come from the official local `codex app-server`
+  interface.
 - **Two pages, one swipe.** Limits up front. Swipe (or tap the dots) to a local detail page with
   today versus all-time spend, plus your live sessions.
 - **Named sessions.** Your actual **conversation titles** from the sidebar, with today's spend per
@@ -122,9 +123,9 @@ Command Line Tools.
 - **Click** the % or ring to expand, and **click away** to collapse.
 - **Swipe** left or right (or tap the dots) to switch between the limits page and the detail page.
 - **Tap the sessions block** to flip between today's active sessions and all-time top projects.
-- **Click the left icon** to switch between Claude and Codex.
-- **Right-click** the island for Provider, Icon, Pause, Animate icon, Hide in full screen, Launch at
-  Login, Check for Updates, and Quit.
+- **Click Clawd** to cycle the icon (Clawd, then mono, then Spark).
+- **Right-click** the island for Provider (Claude or Codex), Icon, Pause, Animate icon, Hide in
+  full screen, Launch at Login, Check for Updates, and Quit.
 
 ## Credits
 

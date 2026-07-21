@@ -239,11 +239,6 @@ final class AppModel {
         case .codex: fetchCodexUsage()
         }
     }
-    func cycleProvider() {
-        let providers = UsageProviderID.allCases
-        guard let index = providers.firstIndex(of: selectedProvider) else { return }
-        selectProvider(providers[(index + 1) % providers.count])
-    }
     func cycleAvatar() { setAvatar(avatarStyle.next) }
     func setAvatar(_ s: AvatarStyle) { avatarStyle = s; AvatarStyle.selected = s }
     func toggleAnimateIcon() {

@@ -1,8 +1,9 @@
-Claude + Codex Notch — usage tracking in your Mac's notch
-==========================================================
+Claude Notch — a Dynamic Island usage tracker for your Mac's notch
+==================================================================
 
-Shows Claude and Codex limits, reset times, credits and token totals
-right in the notch, with provider-specific animated icons.
+Shows your Claude 5-hour, 7-day and credit usage right in the notch,
+with Clawd the crab — plus optional Codex tracking. Same numbers you
+see in Claude Desktop.
 
 REQUIREMENTS
 ------------
@@ -27,9 +28,9 @@ USING IT
   5-hour session % + ring on the right.
 • Click the % / ring to expand: 5-Hour, 7-Day, credits, cost today,
   tokens today, and your plan — each in a tile. Click away to collapse.
-• Click the left icon to switch between Claude and Codex.
-• Right-click the island for provider, icon, animation, pause, launch at
-  login, updates and quit.
+• Click Clawd to switch icon (Clawd → mono → Spark).
+• Right-click the island for the menu: provider (Claude or Codex), icon,
+  animation, pause, launch at login, updates and quit.
 
 PRIVACY
 -------
