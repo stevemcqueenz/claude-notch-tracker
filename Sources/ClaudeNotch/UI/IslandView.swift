@@ -175,7 +175,7 @@ struct IslandView: View {
                 tile("cost today · local", s.isEmpty ? "—" : Fmt.usd(s.costToday), height: .compact,
                      sub: model.projectedCostToday.map { "~\(Fmt.usd($0)) by tonight" })
                 tile("tokens today · local", s.isEmpty ? "—" : Fmt.tokens(s.tokensToday), height: .compact)
-                tile("credits", model.limits?.creditsPct.map { Fmt.pct($0) + " used" } ?? "none", height: .compact)
+                tile("credits", model.creditsValue, height: .compact, sub: model.creditsSubtitle)
             }
             .opacity(model.isStale ? 0.55 : 1)         // dim live limits when not fresh
             if model.isStale {                          // only surface a problem, never chrome

@@ -9,7 +9,9 @@ struct ClaudeLimits: Sendable {
     var sessionResetsAt: Date?
     var weeklyPct: Double?       // 0…1 used (seven_day)
     var weeklyResetsAt: Date?
-    var creditsPct: Double?      // 0…1 used (extra_usage), nil if no credits
+    var creditsPct: Double?      // 0…1 of the monthly extra-usage spend cap used, nil if unknown
+    var creditsBalanceMinor: Int?    // purchased usage-credit balance in minor units (e.g. 4251)
+    var creditsCurrency: String?     // ISO code for the balance, e.g. "EUR"
     var fablePct: Double?        // 0…1 used (Fable's own weekly limit), nil if absent
     var fableResetsAt: Date?
     var source: String?          // where the session came from (e.g. "Brave")
@@ -87,7 +89,31 @@ actor ClaudeAPIService {
               (resp as? HTTPURLResponse)?.statusCode == 200,
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return nil }
-        return parse(obj, source: source)
+        var limits = parse(obj, source: source)
+        if let (minor, currency) = await prepaidBalance(org: org, cookieHeader: header) {
+            limits.creditsBalanceMinor = minor
+            limits.creditsCurrency = currency
+        }
+        return limits
+    }
+
+    /// Purchased usage-credit balance — the "Current balance" figure on claude.ai's Usage credits
+    /// settings page. Lives on its own endpoint, not in /usage (whose `spend.balance` stays null);
+    /// returns e.g. {"amount": 4251, "currency": "EUR"}. Fails soft to nil, never blocks limits.
+    private func prepaidBalance(org: String, cookieHeader: String) async -> (Int, String)? {
+        guard let url = URL(string: "https://claude.ai/api/organizations/\(org)/prepaid/credits")
+        else { return nil }
+        var req = URLRequest(url: url, timeoutInterval: 15)
+        req.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)",
+                     forHTTPHeaderField: "User-Agent")
+        guard let (data, resp) = try? await URLSession.shared.data(for: req),
+              (resp as? HTTPURLResponse)?.statusCode == 200,
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let amount = (obj["amount"] as? NSNumber)?.intValue
+        else { return nil }
+        return (amount, (obj["currency"] as? String) ?? "EUR")
     }
 
     private func parse(_ obj: [String: Any], source: String) -> ClaudeLimits {
@@ -112,7 +138,15 @@ actor ClaudeAPIService {
             w = [wo, ws].compactMap { $0 }.max()
             wr = wor ?? wsr
         }
-        let (c, _) = node("extra_usage")
+        // Extra-usage consumption: `extra_usage.utilization` is null until something is spent, but
+        // the newer `spend` block always carries `percent` when the feature is enabled — prefer
+        // whichever is present so an enabled-but-unused month reads 0%, not "none".
+        var (c, _) = node("extra_usage")
+        if c == nil, let spend = obj["spend"] as? [String: Any],
+           (spend["enabled"] as? Bool) == true,
+           let p = (spend["percent"] as? NSNumber)?.doubleValue {
+            c = min(1, max(0, p / 100))
+        }
 
         // Fable has its own weekly limit (the Desktop app shows it) — a "weekly_scoped" entry in the
         // `limits` array whose scope.model.display_name is "Fable"; its figure is `percent` (0–100).

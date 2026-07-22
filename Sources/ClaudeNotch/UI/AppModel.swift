@@ -104,6 +104,19 @@ final class AppModel {
         return cost / dayFraction
     }
 
+    /// Credits tile: the purchased usage-credit balance when known (what claude.ai settings calls
+    /// "Current balance"), else the extra-usage spend percent, else "none".
+    var creditsValue: String {
+        if let minor = limits?.creditsBalanceMinor, let currency = limits?.creditsCurrency {
+            return Fmt.money(minor: minor, currency: currency)
+        }
+        return limits?.creditsPct.map { Fmt.pct($0) + " used" } ?? "none"
+    }
+    /// When the balance is the headline, the monthly spend percent moves to the subline.
+    var creditsSubtitle: String? {
+        guard limits?.creditsBalanceMinor != nil else { return nil }
+        return limits?.creditsPct.map { Fmt.pct($0) + " used" }
+    }
     private var home: URL { FileManager.default.homeDirectoryForCurrentUser }
     private var usageFileURL: URL { home.appendingPathComponent(".claude/notch-usage.json") }
     private var configURL: URL { home.appendingPathComponent(".claude.json") }

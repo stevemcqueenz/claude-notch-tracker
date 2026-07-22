@@ -35,6 +35,16 @@ enum Fmt {
     }
     static func usd(_ v: Double) -> String { String(format: "$%.2f", v) }
 
+    /// Money from API minor units + ISO currency code, e.g. (4251, "EUR") -> "€42.51".
+    /// Assumes 2 decimal places, which matches every currency claude.ai bills in.
+    static func money(minor: Int, currency: String) -> String {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.currencyCode = currency
+        f.locale = Locale(identifier: "en_US")   // stable symbol-first formatting: €42.51, $42.51
+        return f.string(from: NSNumber(value: Double(minor) / 100)) ?? String(format: "%.2f %@", Double(minor) / 100, currency)
+    }
+
     /// "default_claude_max_5x" -> "Claude Max 5x"; "…_pro" -> "Claude Pro".
     static func planLabel(_ raw: String) -> String {
         var s = raw.replacingOccurrences(of: "default_", with: "")
