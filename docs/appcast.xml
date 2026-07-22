@@ -3,6 +3,23 @@
     <channel>
         <title>Claude Notch</title>
         <item>
+            <title>0.2.1</title>
+            <description><![CDATA[
+                <h2>Usage-credit balance on the credits tile</h2>
+                <p>The credits tile now shows your purchased <b>usage-credit balance</b> (the "Current balance" figure from claude.ai's Usage credits settings), with this month's extra-usage spend as the subline.</p>
+                <ul>
+                    <li>Accounts with usage credits enabled but nothing spent now read "0% used" instead of "none"</li>
+                    <li>The balance is fetched with your existing session; if it can't be read, your limit tiles are unaffected</li>
+                </ul>
+            ]]></description>
+            <pubDate>Wed, 22 Jul 2026 10:20:17 +0200</pubDate>
+            <sparkle:version>0.2.1</sparkle:version>
+            <sparkle:shortVersionString>0.2.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/stevemcqueenz/claude-notch-tracker/releases/download/v0.2.1/ClaudeNotch.zip" length="1534834" type="application/octet-stream" sparkle:edSignature="uEpOWxm3bh78SJRaeIuNvJ3MYZIjNO/bwPokE0Z1T+tBDeR2SvmnSCO+N1h5FMznD6NK+/FAah30WI/XSCI0CQ=="/>
+        </item>
+        <item>
             <title>0.2.0</title>
             <description><![CDATA[
                 <h2>Hide in full screen, rebuilt</h2>
