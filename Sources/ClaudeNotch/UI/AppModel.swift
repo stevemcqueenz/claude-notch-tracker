@@ -120,6 +120,20 @@ final class AppModel {
         return cost / dayFraction
     }
 
+    /// Credits tile: the purchased usage-credit balance when known (what claude.ai settings calls
+    /// "Current balance"), else the extra-usage spend percent, else "none".
+    private var creditsValue: String {
+        if let minor = limits?.creditsBalanceMinor, let currency = limits?.creditsCurrency {
+            return Fmt.money(minor: minor, currency: currency)
+        }
+        return limits?.creditsPct.map { Fmt.pct($0) + " used" } ?? "none"
+    }
+    /// When the balance is the headline, the monthly spend percent moves to the subline.
+    private var creditsSubtitle: String? {
+        guard limits?.creditsBalanceMinor != nil else { return nil }
+        return limits?.creditsPct.map { Fmt.pct($0) + " used" }
+    }
+
     var activeProviderSnapshot: ProviderUsageSnapshot {
         switch selectedProvider {
         case .claude: claudeProviderSnapshot
@@ -147,8 +161,7 @@ final class AppModel {
                             value: snapshot.isEmpty ? "—" : Fmt.tokens(snapshot.tokensToday),
                             subtitle: nil),
             UsageStatMetric(id: "credits", label: "credits",
-                            value: limits?.creditsPct.map { Fmt.pct($0) + " used" } ?? "none",
-                            subtitle: nil),
+                            value: creditsValue, subtitle: creditsSubtitle),
         ]
         if fableUsage == nil {
             stats.insert(
