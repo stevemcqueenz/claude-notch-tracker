@@ -124,17 +124,27 @@ final class AppModel {
     }
 
     /// Credits tile: the purchased usage-credit balance when known (what claude.ai settings calls
-    /// "Current balance"), else the extra-usage spend percent, else "none".
+    /// "Current balance"), else the monthly spend, else "none".
     private var creditsValue: String {
         if let minor = limits?.creditsBalanceMinor, let currency = limits?.creditsCurrency {
             return Fmt.money(minor: minor, currency: currency)
         }
+        if let spend = monthlySpendLabel { return spend }
         return limits?.creditsPct.map { Fmt.pct($0) + " used" } ?? "none"
     }
-    /// When the balance is the headline, the monthly spend percent moves to the subline.
+    /// Subline under the balance: this month's extra-usage spend in absolute money against the
+    /// monthly cap. A bare percent read as "percent of my credits" — but it tracks the CAP, so an
+    /// emptied balance could sit at "90% used" and look like headroom that isn't there.
     private var creditsSubtitle: String? {
         guard limits?.creditsBalanceMinor != nil else { return nil }
-        return limits?.creditsPct.map { Fmt.pct($0) + " used" }
+        return monthlySpendLabel.map { $0 + "/mo" }
+            ?? limits?.creditsPct.map { Fmt.pct($0) + " of cap" }
+    }
+    /// "€45.21 of €50.00" from the spend block, when the API provides the amounts.
+    private var monthlySpendLabel: String? {
+        guard let used = limits?.spendUsedMinor, let cap = limits?.spendCapMinor, cap > 0,
+              let currency = limits?.spendCurrency else { return nil }
+        return "\(Fmt.money(minor: used, currency: currency)) of \(Fmt.money(minor: cap, currency: currency))"
     }
 
     var activeProviderSnapshot: ProviderUsageSnapshot {
@@ -235,7 +245,10 @@ final class AppModel {
         codexTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.fetchCodexUsage() }
         }
-        Task { await ingest(ClaudePaths.recentLogFiles(within: 2)) }
+        Task.detached(priority: .utility) { [weak self] in
+            let files = ClaudePaths.recentLogFiles(within: 2)   // recursive walk stays off-main
+            await self?.ingest(files)
+        }
         fetchLimits()
         fetchCodexUsage()
         scanLifetime()
@@ -250,6 +263,15 @@ final class AppModel {
         Task { [lifetimeScanner] in
             let totals = await lifetimeScanner.scan()
             self.lifetime = totals
+        }
+    }
+
+    /// Menu action: refetch the selected provider immediately and recompute local state.
+    func refreshNow() {
+        refresh()
+        switch selectedProvider {
+        case .claude: fetchLimits()
+        case .codex: fetchCodexUsage()
         }
     }
 
@@ -343,14 +365,19 @@ final class AppModel {
     /// with no prior same-day activity). Throttled and mtime-gated so unchanged files are skipped.
     private func reingestChangedFiles() {
         guard !isPaused, Date().timeIntervalSince(lastReingest) >= 10 else { return }
-        let changed = ClaudePaths.recentLogFiles(within: 2)
-            .filter { Self.mtime($0) > (parsedMTimes[$0] ?? .distantPast) }
-        guard !changed.isEmpty else { return }
-        lastReingest = Date()
-        Task { await ingest(changed) }
+        lastReingest = Date()   // stamped up-front so overlapping sweeps can't stack
+        let known = parsedMTimes
+        Task.detached(priority: .utility) { [weak self] in
+            // The recursive directory walk and the per-file stats run off the MainActor; only
+            // the resulting ingest hops back. Large log histories no longer stall the UI.
+            let changed = ClaudePaths.recentLogFiles(within: 2)
+                .filter { Self.mtime($0) > (known[$0] ?? .distantPast) }
+            guard !changed.isEmpty else { return }
+            await self?.ingest(changed)
+        }
     }
 
-    private static func mtime(_ url: URL) -> Date {
+    nonisolated private static func mtime(_ url: URL) -> Date {
         (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
             .contentModificationDate ?? .distantPast
     }
@@ -372,7 +399,9 @@ final class AppModel {
         f.dateFormat = "yyyy-MM-dd"
         let now = Date()
         return (0..<7).reversed().compactMap { back in
-            guard let day = calendar.date(byAdding: .day, value: -back, to: now) else { return nil }
+            // startOfDay so a bar's identity is stable across refreshes (SwiftUI diffs by date).
+            guard let raw = calendar.date(byAdding: .day, value: -back, to: now) else { return nil }
+            let day = calendar.startOfDay(for: raw)
             let key = f.string(from: day)
             var tokens = lifetime.recentDays[key]?.tokens ?? 0
             var cost = lifetime.recentDays[key]?.cost ?? 0

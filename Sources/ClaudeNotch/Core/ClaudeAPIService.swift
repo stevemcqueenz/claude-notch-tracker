@@ -12,6 +12,9 @@ struct ClaudeLimits: Sendable {
     var creditsPct: Double?      // 0…1 of the monthly extra-usage spend cap used, nil if unknown
     var creditsBalanceMinor: Int?    // purchased usage-credit balance in minor units (e.g. 4251)
     var creditsCurrency: String?     // ISO code for the balance, e.g. "EUR"
+    var spendUsedMinor: Int?         // extra usage spent this month, minor units (spend.used)
+    var spendCapMinor: Int?          // monthly spend limit, minor units (spend.cap.money)
+    var spendCurrency: String?       // ISO code for the spend figures
     var fablePct: Double?        // 0…1 used (Fable's own weekly limit), nil if absent
     var fableResetsAt: Date?
     var source: String?          // where the session came from (e.g. "Brave")
@@ -142,10 +145,18 @@ actor ClaudeAPIService {
         // the newer `spend` block always carries `percent` when the feature is enabled — prefer
         // whichever is present so an enabled-but-unused month reads 0%, not "none".
         var (c, _) = node("extra_usage")
-        if c == nil, let spend = obj["spend"] as? [String: Any],
-           (spend["enabled"] as? Bool) == true,
-           let p = (spend["percent"] as? NSNumber)?.doubleValue {
-            c = min(1, max(0, p / 100))
+        var spendUsed: Int?
+        var spendCap: Int?
+        var spendCurrency: String?
+        if let spend = obj["spend"] as? [String: Any], (spend["enabled"] as? Bool) == true {
+            if c == nil, let p = (spend["percent"] as? NSNumber)?.doubleValue {
+                c = min(1, max(0, p / 100))
+            }
+            spendUsed = ((spend["used"] as? [String: Any])?["amount_minor"] as? NSNumber)?.intValue
+            let cap = (spend["cap"] as? [String: Any])?["money"] as? [String: Any]
+            spendCap = (cap?["amount_minor"] as? NSNumber)?.intValue
+            spendCurrency = (spend["used"] as? [String: Any])?["currency"] as? String
+                ?? cap?["currency"] as? String
         }
 
         // Fable has its own weekly limit (the Desktop app shows it) — a "weekly_scoped" entry in the
@@ -167,7 +178,10 @@ actor ClaudeAPIService {
 
         return ClaudeLimits(sessionPct: s, sessionResetsAt: sr,
                             weeklyPct: w, weeklyResetsAt: wr,
-                            creditsPct: c, fablePct: f, fableResetsAt: fr,
+                            creditsPct: c,
+                            spendUsedMinor: spendUsed, spendCapMinor: spendCap,
+                            spendCurrency: spendCurrency,
+                            fablePct: f, fableResetsAt: fr,
                             source: source, fetchedAt: Date())
     }
 

@@ -27,7 +27,10 @@ enum LogParser {
         let customTitle: String?
     }
 
-    static let decoder: JSONDecoder = {
+    /// A fresh decoder per batch: parsing runs from several actors concurrently (live loader,
+    /// lifetime scanner), and neither JSONDecoder nor a shared date-strategy closure is documented
+    /// concurrency-safe. Costs nothing at batch granularity.
+    private static func makeDecoder() -> JSONDecoder {
         let d = JSONDecoder()
         let fmt = ISO8601DateFormatter()
         fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -40,7 +43,7 @@ enum LogParser {
                 debugDescription: "bad date \(s)"))
         }
         return d
-    }()
+    }
 
     /// A parsed batch of log bytes: usage events plus any conversation titles (sessionId → name).
     struct Batch: Sendable {
@@ -95,9 +98,10 @@ enum LogParser {
         var events: [UsageEvent] = []
         var titles: [String: String] = [:]
         let titleMarker = Data("custom-title".utf8)
+        let decoder = makeDecoder()
         for raw in data.split(separator: 0x0A, omittingEmptySubsequences: true) {
             let d = Data(raw)
-            if let e = parseLine(d) { events.append(e); continue }
+            if let e = parseLine(d, decoder: decoder) { events.append(e); continue }
             // Cheap byte pre-check so we don't second-decode every non-event line.
             if d.range(of: titleMarker) != nil,
                let t = try? decoder.decode(TitleLine.self, from: d),
@@ -108,7 +112,7 @@ enum LogParser {
         return Batch(events: events, titles: titles)
     }
 
-    private static func parseLine(_ data: Data) -> UsageEvent? {
+    private static func parseLine(_ data: Data, decoder: JSONDecoder) -> UsageEvent? {
         guard let line = try? decoder.decode(Line.self, from: data),
               line.type == "assistant",
               let msg = line.message,

@@ -346,7 +346,9 @@ enum CodexSnapshotMapper {
         let byDay = Dictionary(buckets.map { ($0.startDate, $0.tokens) }, uniquingKeysWith: +)
         let calendar = Calendar.current
         return (0..<7).reversed().compactMap { back in
-            guard let day = calendar.date(byAdding: .day, value: -back, to: now) else { return nil }
+            // startOfDay so a bar's identity is stable across refreshes (SwiftUI diffs by date).
+            guard let raw = calendar.date(byAdding: .day, value: -back, to: now) else { return nil }
+            let day = calendar.startOfDay(for: raw)
             return DailyUsagePoint(date: day, tokens: byDay[dayString(day)] ?? 0)
         }
     }
