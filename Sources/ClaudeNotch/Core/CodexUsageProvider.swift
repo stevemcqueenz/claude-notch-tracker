@@ -124,6 +124,7 @@ enum CodexSnapshotMapper {
         now: Date
     ) -> ProviderUsageSnapshot {
         let limits = rateLimits.map(makeLimits) ?? []
+        let series = weekSeries(usage, now: now)
         let todayTokens = usage.flatMap { usage in
             usage.dailyUsageBuckets?.first(where: { $0.startDate == dayString(now) })?.tokens
         }
@@ -134,7 +135,7 @@ enum CodexSnapshotMapper {
         let credits = rateLimits.flatMap(creditsLabel)
 
         // Order = display priority. The chart layout shows only the first slot or two next to the
-        // limit windows, so live numbers lead (today, credits, streak); the page-2 tiles pull
+        // limit windows, so live numbers lead (today, credits, yesterday); the page-2 tiles pull
         // all-time and peak by id, and the remainder only ever fills the no-feed fallback grid.
         var stats: [UsageStatMetric] = []
         if let todayTokens {
@@ -144,10 +145,11 @@ enum CodexSnapshotMapper {
         if let credits {
             stats.append(.init(id: "credits", label: "credits", value: credits, subtitle: nil))
         }
-        if let longest = usage?.summary.longestStreakDays, longest > 0 {
-            let current = usage?.summary.currentStreakDays ?? 0
-            stats.append(.init(id: "streak", label: "streak",
-                               value: "\(current)d", subtitle: "best \(longest)d"))
+        // The account feed often posts today's bucket late; yesterday is the freshest number
+        // that's reliably there, so it fills the slot until today's figure exists.
+        if series.count == 7, let yesterday = series.dropLast().last, yesterday.tokens > 0 {
+            stats.append(.init(id: "tokens-yesterday", label: "yesterday · account",
+                               value: Fmt.tokens(yesterday.tokens), subtitle: nil))
         }
         if let planName {
             stats.append(.init(id: "plan", label: "plan", value: planName, subtitle: nil))
@@ -192,7 +194,7 @@ enum CodexSnapshotMapper {
             stats: stats,
             todayTokens: todayTokens,
             lifetimeTokens: lifetimeTokens,
-            dailySeries: weekSeries(usage, now: now),
+            dailySeries: series,
             sessionsTitle: "recent tasks",
             sessions: sessions,
             planName: planName,

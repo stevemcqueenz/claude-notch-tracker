@@ -171,9 +171,6 @@ import Testing
         #expect(snapshot.limits.map(\.label) == ["Monthly"])
         #expect(snapshot.stats.first(where: { $0.id == "peak-day" })?.value == Fmt.tokens(501_548_755))
         #expect(snapshot.stats.first(where: { $0.id == "longest-task" })?.value == "15h 14m")
-        let streak = snapshot.stats.first(where: { $0.id == "streak" })
-        #expect(streak?.value == "0d")
-        #expect(streak?.subtitle == "best 9d")
         #expect(snapshot.statusMessage == "Spend limit reached")
         let ids = snapshot.stats.map(\.id)
         #expect(!ids.contains("credits"))   // zero balance: no dead-weight credits tile
@@ -197,6 +194,7 @@ import Testing
           "summary": {"lifetimeTokens": 100},
           "dailyUsageBuckets": [
             {"startDate": "\(day(0))", "tokens": 5},
+            {"startDate": "\(day(1))", "tokens": 7},
             {"startDate": "\(day(2))", "tokens": 11},
             {"startDate": "\(day(30))", "tokens": 999}
           ]
@@ -208,8 +206,10 @@ import Testing
         )
 
         #expect(snapshot.dailySeries.count == 7)
-        #expect(snapshot.dailySeries.map(\.tokens) == [0, 0, 0, 0, 11, 0, 5])
+        #expect(snapshot.dailySeries.map(\.tokens) == [0, 0, 0, 0, 11, 7, 5])
         #expect(Calendar.current.isDateInToday(snapshot.dailySeries.last!.date))
+        #expect(snapshot.weekTokens == 23)
+        #expect(snapshot.stats.first(where: { $0.id == "tokens-yesterday" })?.value == "7")
     }
 
     @Test func suppressesEmptyCreditsTile() throws {
