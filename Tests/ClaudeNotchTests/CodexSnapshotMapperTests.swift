@@ -208,6 +208,15 @@ import Testing
         #expect(snapshot.dailySeries.count == 7)
         #expect(snapshot.dailySeries.map(\.tokens) == [0, 0, 0, 0, 11, 7, 5])
         #expect(Calendar.current.isDateInToday(snapshot.dailySeries.last!.date))
+        // Identities are normalized to startOfDay so bars keep the same identity across
+        // refreshes at different times of day.
+        #expect(snapshot.dailySeries.last!.date == Calendar.current.startOfDay(for: now))
+        let later = CodexSnapshotMapper.make(
+            account: nil, rateLimits: nil, usage: usage, threads: nil,
+            now: now.addingTimeInterval(3600)
+        )
+        #expect(later.dailySeries.map(\.date) == snapshot.dailySeries.map(\.date)
+            || Calendar.current.isDate(now.addingTimeInterval(3600), inSameDayAs: now) == false)
         #expect(snapshot.weekTokens == 23)
         #expect(snapshot.stats.first(where: { $0.id == "tokens-yesterday" })?.value == "7")
     }

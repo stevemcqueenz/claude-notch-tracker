@@ -6,6 +6,10 @@ final class LogWatcher {
     private let onChange: @MainActor ([URL]) -> Void
     private var pending = Set<URL>()
     private var debounce: DispatchWorkItem?
+    /// Both the FSEvents callbacks and the debounce fire on this serial queue, so `pending` and
+    /// `debounce` are only ever touched from one thread. (They used to race between the stream's
+    /// concurrent global queue and the debounce's global-queue thread.)
+    private let queue = DispatchQueue(label: "log-watcher")
 
     init(onChange: @escaping @MainActor ([URL]) -> Void) { self.onChange = onChange }
 
@@ -26,7 +30,7 @@ final class LogWatcher {
            FSEventStreamEventId(kFSEventStreamEventIdSinceNow), 0.3, flags)
         else { return }
         stream = s
-        FSEventStreamSetDispatchQueue(s, DispatchQueue.global(qos: .utility))
+        FSEventStreamSetDispatchQueue(s, queue)
         FSEventStreamStart(s)
     }
 
@@ -47,6 +51,6 @@ final class LogWatcher {
             Task { @MainActor in callback(batch) }
         }
         debounce?.cancel(); debounce = work
-        DispatchQueue.global().asyncAfter(deadline: .now() + 0.25, execute: work)
+        queue.asyncAfter(deadline: .now() + 0.25, execute: work)
     }
 }

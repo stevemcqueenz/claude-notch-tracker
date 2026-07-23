@@ -12,7 +12,18 @@
 #   • Then:  NOTARY_PROFILE=claude-notch-notary bash scripts/make-app.sh
 set -euo pipefail
 
-export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Developer}"
+# Full Xcode required (SwiftUI macros). Honor an explicit DEVELOPER_DIR, else use the selected
+# toolchain, else fall back to a standard Xcode install (beta last).
+if [ -z "${DEVELOPER_DIR:-}" ]; then
+  DEVELOPER_DIR="$(xcode-select -p 2>/dev/null || true)"
+  case "$DEVELOPER_DIR" in
+    *CommandLineTools*|"")
+      for x in /Applications/Xcode.app /Applications/Xcode-beta.app; do
+        if [ -d "$x/Contents/Developer" ]; then DEVELOPER_DIR="$x/Contents/Developer"; break; fi
+      done ;;
+  esac
+fi
+export DEVELOPER_DIR
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP_NAME="Claude Notch"
 DIST="$ROOT/dist"

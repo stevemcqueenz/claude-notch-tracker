@@ -113,6 +113,7 @@ struct IslandView: View {
                 }
             }
         }
+        Button("Refresh now") { model.refreshNow() }
         Button(model.isPaused ? "Resume tracking" : "Pause tracking") { model.togglePause() }
         Button((model.animateIcon ? "✓ " : "") + "Animate icon") { model.toggleAnimateIcon() }
         Button((model.hideInFullscreen ? "✓ " : "") + "Hide in full screen") { model.toggleHideInFullscreen() }
@@ -157,6 +158,11 @@ struct IslandView: View {
             .opacity(model.isStale ? 0.5 : 1)          // dim when data isn't fresh
             .contentShape(Rectangle())
             .onTapGesture { model.isExpanded.toggle() }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(model.selectedProvider.displayName) usage")
+            .accessibilityValue(provider.primaryUsage.map(Fmt.pct) ?? "unknown")
+            .accessibilityHint(model.isExpanded ? "Collapses the usage card" : "Expands the usage card")
+            .accessibilityAddTraits(.isButton)
         }
         .padding(.horizontal, edgeInset)
     }
@@ -226,6 +232,8 @@ struct IslandView: View {
                 Circle().fill(.white.opacity(i == page ? 0.85 : 0.25))
                     .frame(width: 5, height: 5)
                     .onTapGesture { page = i }
+                    .accessibilityLabel(i == 0 ? "Limits page" : "Detail page")
+                    .accessibilityAddTraits(i == page ? [.isButton, .isSelected] : .isButton)
             }
         }
         .frame(height: 8)
@@ -376,6 +384,12 @@ struct IslandView: View {
         .background(Color.white.opacity(0.06)).clipShape(RoundedRectangle(cornerRadius: 10))
         .contentShape(Rectangle())
         .onTapGesture { if hasAlternate { showAllTime.toggle() } }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
+        .accessibilityHint(hasAlternate
+            ? "Switches to \(showingAlternate ? snapshot.sessionsTitle : (snapshot.alternateSessionsTitle ?? ""))"
+            : "")
+        .accessibilityAddTraits(hasAlternate ? .isButton : [])
         .help(hasAlternate ? "Click to switch session views" : "Recent provider activity")
     }
 
