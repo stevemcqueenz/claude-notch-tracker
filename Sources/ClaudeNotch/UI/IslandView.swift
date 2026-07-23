@@ -234,10 +234,15 @@ struct IslandView: View {
     // Page 1 — provider-defined account limits and summary metrics.
     private var pageLimits: some View {
         let snapshot = provider
-        let remainingSlots = max(0, 6 - snapshot.limits.count)
+        // With a daily feed, the page is limits + the week chart as centerpiece; the plain
+        // six-tile grid remains for providers/accounts without one (Claude, API-key Codex).
+        // More than two limit windows also falls back — the windows outrank the chart.
+        let chartLayout = !snapshot.dailySeries.isEmpty && snapshot.limits.count <= 2
+        let gridSlots = chartLayout ? 2 : 6
+        let remainingSlots = max(0, gridSlots - snapshot.limits.count)
         return VStack(spacing: 8) {
             LazyVGrid(columns: [.init(.flexible(), spacing: 8), .init(.flexible(), spacing: 8)], spacing: 8) {
-                ForEach(Array(snapshot.limits.prefix(6))) { metric in
+                ForEach(Array(snapshot.limits.prefix(gridSlots))) { metric in
                     providerLimitTile(metric)
                 }
                 ForEach(Array(snapshot.stats.prefix(remainingSlots))) { metric in
@@ -245,6 +250,10 @@ struct IslandView: View {
                 }
             }
             .opacity(model.isStale ? 0.55 : 1)         // dim live limits when not fresh
+            if chartLayout {
+                WeekActivityChart(series: snapshot.dailySeries)
+                    .opacity(model.isStale ? 0.55 : 1)
+            }
             if let message = snapshot.statusMessage {
                 Spacer(minLength: 0)
                 Text(message).font(.system(size: 10))

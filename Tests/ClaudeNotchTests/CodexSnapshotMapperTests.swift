@@ -175,9 +175,61 @@ import Testing
         #expect(streak?.value == "0d")
         #expect(streak?.subtitle == "best 9d")
         #expect(snapshot.statusMessage == "Spend limit reached")
-        // Spare stats stay behind the important ones so a six-slot grid drops them first.
         let ids = snapshot.stats.map(\.id)
-        #expect(ids.firstIndex(of: "peak-day")! > ids.firstIndex(of: "credits")!)
+        #expect(!ids.contains("credits"))   // zero balance: no dead-weight credits tile
+        // Spare stats stay behind the important ones so a six-slot grid drops them first.
+        #expect(ids.firstIndex(of: "peak-day")! > ids.firstIndex(of: "plan")!)
+    }
+
+    @Test func buildsZeroFilledWeekSeriesEndingToday() throws {
+        let calendar = Calendar.current
+        let now = Date()
+        func day(_ back: Int) -> String {
+            let f = DateFormatter()
+            f.calendar = Calendar(identifier: .gregorian)
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.timeZone = .current
+            f.dateFormat = "yyyy-MM-dd"
+            return f.string(from: calendar.date(byAdding: .day, value: -back, to: now)!)
+        }
+        let usage = try decode(CodexAccountUsageResponse.self, json: """
+        {
+          "summary": {"lifetimeTokens": 100},
+          "dailyUsageBuckets": [
+            {"startDate": "\(day(0))", "tokens": 5},
+            {"startDate": "\(day(2))", "tokens": 11},
+            {"startDate": "\(day(30))", "tokens": 999}
+          ]
+        }
+        """)
+
+        let snapshot = CodexSnapshotMapper.make(
+            account: nil, rateLimits: nil, usage: usage, threads: nil, now: now
+        )
+
+        #expect(snapshot.dailySeries.count == 7)
+        #expect(snapshot.dailySeries.map(\.tokens) == [0, 0, 0, 0, 11, 0, 5])
+        #expect(Calendar.current.isDateInToday(snapshot.dailySeries.last!.date))
+    }
+
+    @Test func suppressesEmptyCreditsTile() throws {
+        let rateLimits = try decode(CodexRateLimitsResponse.self, json: """
+        {
+          "rateLimits": {
+            "credits": {"balance": "0", "hasCredits": false, "unlimited": false},
+            "limitId": "codex",
+            "primary": {"usedPercent": 1, "windowDurationMins": 10080, "resetsAt": 1785160800}
+          },
+          "rateLimitsByLimitId": null
+        }
+        """)
+
+        let snapshot = CodexSnapshotMapper.make(
+            account: nil, rateLimits: rateLimits, usage: nil, threads: nil, now: Date()
+        )
+
+        #expect(!snapshot.stats.contains { $0.id == "credits" })
+        #expect(snapshot.dailySeries.isEmpty)   // no usage feed: UI falls back to the tile grid
     }
 
     @Test func explainsMissingUsageForAPIKeyAuth() throws {

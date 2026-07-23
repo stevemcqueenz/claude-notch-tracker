@@ -50,6 +50,13 @@ struct UsageSessionMetric: Equatable, Sendable, Identifiable {
     let last: Date
 }
 
+/// One day of account-level token usage, for the limits-page activity chart.
+struct DailyUsagePoint: Equatable, Sendable, Identifiable {
+    let date: Date
+    let tokens: Int
+    var id: Date { date }
+}
+
 struct ProviderUsageSnapshot: Equatable, Sendable {
     let provider: UsageProviderID
     var limits: [UsageLimitMetric] = []
@@ -58,6 +65,9 @@ struct ProviderUsageSnapshot: Equatable, Sendable {
     var todayTokens: Int?
     var lifetimeCost: Double?
     var lifetimeTokens: Int?
+    /// Oldest-first, one point per calendar day (7 for a week view); empty = no daily feed, and
+    /// the limits page falls back to a plain tile grid.
+    var dailySeries: [DailyUsagePoint] = []
     var sessionsTitle = "active sessions"
     var sessions: [UsageSessionMetric] = []
     var alternateSessionsTitle: String?

@@ -192,6 +192,7 @@ enum CodexSnapshotMapper {
             stats: stats,
             todayTokens: todayTokens,
             lifetimeTokens: lifetimeTokens,
+            dailySeries: weekSeries(usage, now: now),
             sessionsTitle: "recent tasks",
             sessions: sessions,
             planName: planName,
@@ -317,16 +318,34 @@ enum CodexSnapshotMapper {
         return snapshots.contains { $0.spendControlReached == true }
     }
 
+    /// nil (no tile at all) unless there is actually something to say — a "credits: 0" tile is
+    /// dead weight on a page this small.
     private static func creditsLabel(_ response: CodexRateLimitsResponse) -> String? {
         let snapshots = [response.rateLimits] + (response.rateLimitsByLimitId?.values.map { $0 } ?? [])
         guard let credits = snapshots.compactMap(\.credits).first else { return nil }
         if credits.unlimited { return "unlimited" }
-        if let balance = credits.balance, !balance.isEmpty { return balance }
-        return credits.hasCredits ? "available" : "none"
+        if let balance = credits.balance, !balance.isEmpty,
+           Double(balance).map({ $0 > 0 }) ?? true {   // non-numeric strings pass through as-is
+            return balance
+        }
+        return credits.hasCredits ? "available" : nil
     }
 
     private static func planLabel(_ raw: String) -> String {
         "Codex " + raw.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+
+    /// The last seven calendar days (oldest first, ending today), zero-filled from the account's
+    /// daily buckets. Empty when the account provides no daily feed at all (e.g. API-key auth),
+    /// which tells the UI to fall back to the plain tile grid.
+    private static func weekSeries(_ usage: CodexAccountUsageResponse?, now: Date) -> [DailyUsagePoint] {
+        guard let buckets = usage?.dailyUsageBuckets, !buckets.isEmpty else { return [] }
+        let byDay = Dictionary(buckets.map { ($0.startDate, $0.tokens) }, uniquingKeysWith: +)
+        let calendar = Calendar.current
+        return (0..<7).reversed().compactMap { back in
+            guard let day = calendar.date(byAdding: .day, value: -back, to: now) else { return nil }
+            return DailyUsagePoint(date: day, tokens: byDay[dayString(day)] ?? 0)
+        }
     }
 
     private static func dayString(_ date: Date) -> String {
