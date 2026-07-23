@@ -272,24 +272,37 @@ struct IslandView: View {
     // Page 2 — provider detail: today vs all-time totals and recent sessions/tasks.
     private var pageLocal: some View {
         let snapshot = provider
+        // A bare "today: —" tile is dead weight. When the provider has no today figure but does
+        // have a daily feed, show the week total instead — always a real number.
+        let showWeek = snapshot.todayCost == nil && snapshot.todayTokens == nil
+            && snapshot.weekTokens != nil
+        // "peak 501.5M" beats the word "tokens" under the all-time figure, when known.
+        let peakDetail = snapshot.stats.first(where: { $0.id == "peak-day" })
+            .map { "peak \($0.value)" }
         return VStack(spacing: 8) {
             HStack(spacing: 8) {
-                statTile("today", cost: snapshot.todayCost, tokens: snapshot.todayTokens)
-                statTile("all-time", cost: snapshot.lifetimeCost, tokens: snapshot.lifetimeTokens)
+                if showWeek {
+                    statTile("this week · account", cost: nil, tokens: snapshot.weekTokens)
+                } else {
+                    statTile("today", cost: snapshot.todayCost, tokens: snapshot.todayTokens)
+                }
+                statTile("all-time", cost: snapshot.lifetimeCost, tokens: snapshot.lifetimeTokens,
+                         detail: peakDetail)
             }
             sessionsBlock
             Spacer(minLength: 0)
         }
     }
 
-    private func statTile(_ label: String, cost: Double?, tokens: Int?) -> some View {
+    private func statTile(_ label: String, cost: Double?, tokens: Int?,
+                          detail: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label).font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
                 .lineLimit(1).minimumScaleFactor(0.8)
             Text(summaryPrimary(cost: cost, tokens: tokens))
                 .font(.system(size: 15, weight: .semibold)).monospacedDigit()
                 .foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.6)
-            Text(summarySecondary(cost: cost, tokens: tokens))
+            Text(detail ?? summarySecondary(cost: cost, tokens: tokens))
                 .font(.system(size: 9.5)).monospacedDigit()
                 .foregroundStyle(.white.opacity(0.45)).lineLimit(1).minimumScaleFactor(0.7)
         }

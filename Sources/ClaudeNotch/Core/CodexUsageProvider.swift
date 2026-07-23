@@ -133,24 +133,29 @@ enum CodexSnapshotMapper {
         let planName = (accountPlan ?? ratePlan).map(planLabel)
         let credits = rateLimits.flatMap(creditsLabel)
 
+        // Order = display priority. The chart layout shows only the first slot or two next to the
+        // limit windows, so live numbers lead (today, credits, streak); the page-2 tiles pull
+        // all-time and peak by id, and the remainder only ever fills the no-feed fallback grid.
         var stats: [UsageStatMetric] = []
         if let todayTokens {
             stats.append(.init(id: "tokens-today", label: "tokens today · account",
                                value: Fmt.tokens(todayTokens), subtitle: nil))
         }
-        if let lifetimeTokens {
-            stats.append(.init(id: "tokens-lifetime", label: "tokens · all-time",
-                               value: Fmt.tokens(lifetimeTokens), subtitle: nil))
-        }
         if let credits {
             stats.append(.init(id: "credits", label: "credits", value: credits, subtitle: nil))
+        }
+        if let longest = usage?.summary.longestStreakDays, longest > 0 {
+            let current = usage?.summary.currentStreakDays ?? 0
+            stats.append(.init(id: "streak", label: "streak",
+                               value: "\(current)d", subtitle: "best \(longest)d"))
         }
         if let planName {
             stats.append(.init(id: "plan", label: "plan", value: planName, subtitle: nil))
         }
-        // Spare-capacity lifetime stats, deliberately LAST: the grid caps at six tiles, so these
-        // only fill slots the important tiles left empty (accounts with one limit window and a
-        // lagging daily feed would otherwise show a sparse four-tile page).
+        if let lifetimeTokens {
+            stats.append(.init(id: "tokens-lifetime", label: "tokens · all-time",
+                               value: Fmt.tokens(lifetimeTokens), subtitle: nil))
+        }
         if let peak = usage?.summary.peakDailyTokens, peak > 0 {
             stats.append(.init(id: "peak-day", label: "peak day",
                                value: Fmt.tokens(peak), subtitle: nil))
@@ -158,11 +163,6 @@ enum CodexSnapshotMapper {
         if let turn = usage?.summary.longestRunningTurnSec, turn > 0 {
             stats.append(.init(id: "longest-task", label: "longest task",
                                value: turnLabel(turn), subtitle: nil))
-        }
-        if let longest = usage?.summary.longestStreakDays, longest > 0 {
-            let current = usage?.summary.currentStreakDays ?? 0
-            stats.append(.init(id: "streak", label: "streak",
-                               value: "\(current)d", subtitle: "best \(longest)d"))
         }
 
         let sessions = threads?.data.prefix(3).map { thread in

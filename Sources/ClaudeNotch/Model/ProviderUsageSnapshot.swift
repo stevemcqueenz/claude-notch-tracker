@@ -84,6 +84,11 @@ struct ProviderUsageSnapshot: Equatable, Sendable {
         limits.first?.usedFraction
     }
 
+    /// Total tokens across the daily series (the chart's week), nil without a daily feed.
+    var weekTokens: Int? {
+        dailySeries.isEmpty ? nil : dailySeries.reduce(0) { $0 + $1.tokens }
+    }
+
     var maximumUsage: Double {
         limits.compactMap(\.usedFraction).max() ?? 0
     }
