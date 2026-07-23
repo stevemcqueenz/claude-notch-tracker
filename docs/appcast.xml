@@ -3,6 +3,26 @@
     <channel>
         <title>Claude Notch</title>
         <item>
+            <title>0.3.0</title>
+            <description><![CDATA[
+                <h2>Claude & Codex</h2>
+                <p>The island now tracks <b>two providers</b>. Click the left icon (or use the right-click Provider menu) to switch between Claude and Codex. Codex support was contributed by <a href="https://github.com/0xhyperdan">@0xhyperdan</a>.</p>
+                <ul>
+                    <li><b>Codex</b>: rate-limit windows with reset countdowns, account token totals, credits, and recent tasks, all via the official local codex app-server (ChatGPT or Codex app, Homebrew, or PATH)</li>
+                    <li><b>Week at a glance</b>: both providers chart the last 7 days in the island — Claude's local spend in dollars, Codex's account tokens, with today highlighted and the peak day labeled</li>
+                    <li><b>Credits balance</b>: the Claude credits tile shows your purchased usage-credit balance with the monthly spend as subline</li>
+                    <li>Cleaner pages: all-time joined the limits page, and empty filler tiles are gone</li>
+                </ul>
+                <p>Privacy unchanged: everything stays local, talking only to the respective first-party services with your own sessions. Thanks to <b>0xhyperdan</b> for the contribution.</p>
+            ]]></description>
+            <pubDate>Thu, 23 Jul 2026 13:19:53 +0200</pubDate>
+            <sparkle:version>0.3.0</sparkle:version>
+            <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/stevemcqueenz/claude-notch-tracker/releases/download/v0.3.0/ClaudeNotch.zip" length="1672807" type="application/octet-stream" sparkle:edSignature="DbKHCM1SoKHLe5BVJBPN+KwV66EA+gdTqWJAzB4jcD1wOHDb0N41VkmNyX4f3AssPL/cVUdc2KERkpIjveiVBQ=="/>
+        </item>
+        <item>
             <title>0.2.1</title>
             <description><![CDATA[
                 <h2>Usage-credit balance on the credits tile</h2>
