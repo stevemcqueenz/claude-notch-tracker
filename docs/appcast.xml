@@ -3,6 +3,25 @@
     <channel>
         <title>Claude Notch</title>
         <item>
+            <title>0.3.1</title>
+            <description><![CDATA[
+                <h2>Polish and clarity</h2>
+                <ul>
+                    <li><b>Clearer credits tile</b>: the subline now shows this month's extra-usage spend in absolute money ("€45.21 of €50.00/mo") instead of a bare percent, so an emptied balance can't look like leftover headroom</li>
+                    <li><b>New "Refresh now"</b> in the right-click menu refetches the selected provider immediately</li>
+                    <li>Smoother under the hood: log discovery moved off the main thread (no UI stalls with large histories), a rare file-watcher race fixed, and stable chart bar identities</li>
+                    <li>VoiceOver: the expand control, page dots, and sessions toggle are now proper labeled buttons</li>
+                    <li>Building from source auto-detects your Xcode toolchain</li>
+                </ul>
+            ]]></description>
+            <pubDate>Thu, 23 Jul 2026 14:34:58 +0200</pubDate>
+            <sparkle:version>0.3.1</sparkle:version>
+            <sparkle:shortVersionString>0.3.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/stevemcqueenz/claude-notch-tracker/releases/download/v0.3.1/ClaudeNotch.zip" length="1682243" type="application/octet-stream" sparkle:edSignature="+8AJR49ti5T9G+9Gr2b45KUfE+0k56pR5If3yBZeo/JxsJxlbgGJgA5TBOuam6K4k7RoraPxYchWxkLv6bJtBg=="/>
+        </item>
+        <item>
             <title>0.3.0</title>
             <description><![CDATA[
                 <h2>Claude & Codex</h2>
