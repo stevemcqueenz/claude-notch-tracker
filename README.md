@@ -29,8 +29,8 @@ your spend and sessions sit behind. Click away and it glides shut. No Dock icon,
   <sub><b>Limits</b>: 5-hour, 7-day, Fable weekly, plus today's cost</sub>
 </td>
 <td align="center" width="50%">
-  <img src="docs/page-sessions.png" width="340" alt="Active sessions: today's spend per conversation" /><br/>
-  <sub><b>Active sessions</b>: today's spend, per conversation</sub>
+  <img src="docs/page-sessions.png" width="340" alt="Claude week chart and active sessions: last 7 days of local spend above today's conversations" /><br/>
+  <sub><b>Week + sessions</b>: 7 days of spend, live conversations</sub>
 </td>
 </tr>
 <tr>
@@ -45,11 +45,11 @@ your spend and sessions sit behind. Click away and it glides shut. No Dock icon,
 </tr>
 <tr>
 <td align="center" width="50%">
-  <img src="docs/codex-limits.png" width="340" alt="Codex limits page: weekly window, tokens, credits, plan, peak day, longest task" /><br/>
-  <sub><b>Codex limits</b>: windows, credits, plan + lifetime stats</sub>
+  <img src="docs/codex-limits.png" width="340" alt="Codex limits page: rate-limit windows above the 7-day token chart" /><br/>
+  <sub><b>Codex limits</b>: windows + the 7-day token chart</sub>
 </td>
 <td align="center" width="50%">
-  <img src="docs/codex-tasks.png" width="340" alt="Codex detail page: account token totals and recent tasks" /><br/>
+  <img src="docs/codex-tasks.png" width="340" alt="Codex detail page: weekly and all-time account totals above recent tasks" /><br/>
   <sub><b>Codex tasks</b>: account totals + recent tasks</sub>
 </td>
 </tr>
@@ -65,15 +65,16 @@ your spend and sessions sit behind. Click away and it glides shut. No Dock icon,
 - **Real limit tiles.** Your **5-hour** session, **7-day** weekly, *and* **Fable's own weekly
   limit**. Fable is metered separately, so you get the same three bars the Claude desktop app
   shows, each with a reset countdown and colour-coded urgency.
-- **Claude and Codex providers.** Click the left icon to switch providers. Codex limits, credits,
-  plan, token totals, lifetime stats, and recent tasks come from the official local
-  `codex app-server` interface.
+- **Claude and Codex providers.** Click the left icon to switch providers. Codex windows, token
+  totals, credits, and recent tasks come from the official local `codex app-server` interface.
 - **Two pages, one swipe.** Limits up front. Swipe (or tap the dots) to a local detail page with
   today versus all-time spend, plus your live sessions.
 - **Named sessions.** Your actual **conversation titles** from the sidebar, with today's spend per
   conversation. Tap the block to flip to your **all-time biggest projects**.
-- **Cost, live.** Cost and tokens today, an **"~$X by tonight"** projection, and all-time totals
-  from a full-history scan of your logs.
+- **Cost, live.** Cost today with an **"~$X by tonight"** projection, your usage-credit balance,
+  and all-time totals from a full-history scan of your logs.
+- **A week at a glance.** Both providers chart the **last 7 days** right in the island: Claude's
+  local spend in dollars, Codex's account tokens, with today highlighted and the peak day labeled.
 - **Any Claude login works.** Use **Claude Desktop**, a **browser** signed into claude.ai, or the
   **Claude Code CLI** (terminal only, with no desktop app or browser needed).
 - **Hide in full screen.** An opt-in toggle tucks the island up into the notch while a full-screen

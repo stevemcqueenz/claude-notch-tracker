@@ -18,7 +18,8 @@ The Codex provider uses the official local `codex app-server` JSON-RPC interface
 
 - `account/read` returns the login type and plan;
 - `account/rateLimits/read` returns dynamic limit windows, reset times, and credits;
-- `account/usage/read` returns account-level daily and lifetime token totals;
+- `account/usage/read` returns account-level daily buckets (rendered as the 7-day chart) and
+  lifetime token totals;
 - `thread/list` returns recent task metadata.
 
 The app does not parse private `~/.codex/sessions` JSONL files and does not estimate Codex dollar
