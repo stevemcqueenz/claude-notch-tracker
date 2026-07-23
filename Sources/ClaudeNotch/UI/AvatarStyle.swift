@@ -2,8 +2,8 @@ import SwiftUI
 import ServiceManagement
 
 enum AppInfo {
-    static let version = "0.2.1"
-    static let tagline = "Made with Claude"
+    static let version = "0.3.0"
+    static let tagline = "Claude & Codex"
 }
 
 /// Launch-at-login toggle (only effective when running as a bundled .app).

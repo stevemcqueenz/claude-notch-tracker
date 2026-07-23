@@ -4,6 +4,10 @@ import SwiftUI
 @MainActor @Observable
 final class AppModel {
     private(set) var snapshot: UsageSnapshot = .empty
+    private(set) var codexSnapshot: ProviderUsageSnapshot = .unavailable(.codex)
+    private(set) var selectedProvider = UsageProviderID(
+        rawValue: UserDefaults.standard.string(forKey: "selectedProvider") ?? ""
+    ) ?? .claude
     /// Projects worked in today with their spend (from the logs), most-recently-active first.
     var sessionsToday: [ProjectUsage] { snapshot.projectsToday }
     var isExpanded = false
@@ -31,14 +35,19 @@ final class AppModel {
 
     /// Lifetime tokens + cost across every log (scanned off-main, refreshed periodically).
     private(set) var lifetime: LifetimeScanner.Totals = .init()
+    /// Local per-day activity for the week chart (scanner data, today overridden live).
+    /// Recomputed on each refresh() tick rather than per render.
+    private(set) var claudeDailySeries: [DailyUsagePoint] = []
 
     private let store = UsageStore()
     private let loader = LogLoader()
     private let claudeAPI = ClaudeAPIService()
+    private let codexProvider = CodexUsageProvider()
     private let lifetimeScanner = LifetimeScanner()
     private var watcher: LogWatcher?
     private var ticker: Timer?
     private var limitsTimer: Timer?
+    private var codexTimer: Timer?
     private var lifetimeTimer: Timer?
     /// mtime of each log file the last time we parsed it, so the periodic sweep re-reads only
     /// files that actually grew and skips the rest.
@@ -51,16 +60,17 @@ final class AppModel {
 
     // MARK: display values (prefer live limits, then terminal feed, then estimate)
 
-    var sessionUsage: Double? {
+    private var claudeSessionUsage: Double? {
         limits?.sessionPct ?? statuslineUsage ?? (snapshot.isEmpty ? nil : snapshot.blockUsageEstimate)
     }
+    var sessionUsage: Double? { activeProviderSnapshot.primaryUsage }
     var weeklyUsage: Double? { limits?.weeklyPct }
     var fableUsage: Double? { limits?.fablePct }          // Fable's own weekly limit (if provided)
     var fableResetsAt: Date? { limits?.fableResetsAt }
     var sessionResetsAt: Date? { limits?.sessionResetsAt }
     var weeklyResetsAt: Date? { limits?.weeklyResetsAt ?? weeklyResetFromConfig }
     var lastFetch: Date? { limits?.fetchedAt }
-    var usageSource: String {
+    private var claudeUsageSource: String {
         if let l = limits { return l.source ?? "claude.ai" }
         if statuslineUsage != nil { return "terminal" }
         return "estimate"
@@ -68,14 +78,14 @@ final class AppModel {
     /// True when live limits exist but haven't refreshed recently (fetches failing) — the UI
     /// dims the numbers so a frozen value is never shown as if it were current.
     var isStale: Bool {
-        guard let f = limits?.fetchedAt else { return false }
-        return Date().timeIntervalSince(f) > staleAfter
+        activeProviderSnapshot.isStale(after: staleAfter)
     }
     private let staleAfter: TimeInterval = 150   // ~2–3 missed 60s fetches
 
     /// Estimated time until the 5-hour limit at the current pace (nil if usage isn't trending
     /// up, or if the block resets first). Uses the slope of session % — no token cap needed.
     var etaToLimit: TimeInterval? {
+        guard selectedProvider == .claude else { return nil }
         guard let cur = limits?.sessionPct, cur < 0.999, pctHistory.count >= 2 else { return nil }
         let recent = Array(pctHistory.suffix(8))
         guard let first = recent.first, let last = recent.last else { return nil }
@@ -88,7 +98,16 @@ final class AppModel {
     }
 
     /// How urgent the icon should look (0…1) — drives Clawd's walk speed.
-    var iconUrgency: Double { max(sessionUsage ?? 0, limits?.weeklyPct ?? 0) }
+    ///
+    /// Claude deliberately uses only the 5-hour and 7-day limits, as before multi-provider: the
+    /// Fable weekly limit is a per-model cap, and a maxed Fable would otherwise freeze Clawd at
+    /// "out of budget" while the account still has plenty of session/weekly headroom.
+    var iconUrgency: Double {
+        switch selectedProvider {
+        case .claude: max(claudeSessionUsage ?? 0, weeklyUsage ?? 0)
+        case .codex: codexSnapshot.maximumUsage
+        }
+    }
 
     /// A limit (5-hour or 7-day) is used up — there's nothing left to spend, so Clawd stops
     /// walking and stands still rather than sprinting at max speed.
@@ -106,17 +125,96 @@ final class AppModel {
 
     /// Credits tile: the purchased usage-credit balance when known (what claude.ai settings calls
     /// "Current balance"), else the extra-usage spend percent, else "none".
-    var creditsValue: String {
+    private var creditsValue: String {
         if let minor = limits?.creditsBalanceMinor, let currency = limits?.creditsCurrency {
             return Fmt.money(minor: minor, currency: currency)
         }
         return limits?.creditsPct.map { Fmt.pct($0) + " used" } ?? "none"
     }
     /// When the balance is the headline, the monthly spend percent moves to the subline.
-    var creditsSubtitle: String? {
+    private var creditsSubtitle: String? {
         guard limits?.creditsBalanceMinor != nil else { return nil }
         return limits?.creditsPct.map { Fmt.pct($0) + " used" }
     }
+
+    var activeProviderSnapshot: ProviderUsageSnapshot {
+        switch selectedProvider {
+        case .claude: claudeProviderSnapshot
+        case .codex: codexSnapshot
+        }
+    }
+
+    private var claudeProviderSnapshot: ProviderUsageSnapshot {
+        var usageLimits = [
+            UsageLimitMetric(id: "claude-session", label: "5-Hour",
+                             usedFraction: claudeSessionUsage, resetsAt: sessionResetsAt),
+            UsageLimitMetric(id: "claude-weekly", label: "7-Day",
+                             usedFraction: weeklyUsage, resetsAt: weeklyResetsAt),
+        ]
+        if fableUsage != nil {
+            usageLimits.append(UsageLimitMetric(id: "claude-fable", label: "Fable",
+                                                usedFraction: fableUsage, resetsAt: fableResetsAt))
+        }
+
+        var stats = [
+            UsageStatMetric(id: "cost-today", label: "cost today · local",
+                            value: snapshot.isEmpty ? "—" : Fmt.usd(snapshot.costToday),
+                            subtitle: projectedCostToday.map { "~\(Fmt.usd($0)) by tonight" }),
+            UsageStatMetric(id: "credits", label: "credits",
+                            value: creditsValue, subtitle: creditsSubtitle),
+            // All-time lives here now; the detail page belongs to the week chart + sessions,
+            // and "tokens today" is redundant with the chart's highlighted today bar.
+            UsageStatMetric(id: "all-time", label: "all-time · local",
+                            value: lifetime.tokens == 0 ? "—" : Fmt.usd(lifetime.cost),
+                            subtitle: lifetime.tokens == 0 ? nil : Fmt.tokens(lifetime.tokens)),
+        ]
+        if fableUsage == nil {
+            stats.insert(
+                UsageStatMetric(id: "fable-tokens", label: "Fable",
+                                value: lifetime.fableTokens == 0 ? "—" : Fmt.tokens(lifetime.fableTokens),
+                                subtitle: "all-time"),
+                at: 0
+            )
+        }
+
+        var currentSessions = sessionsToday.map {
+            UsageSessionMetric(id: $0.id, name: $0.name, cost: $0.cost,
+                               tokens: $0.tokens, last: $0.last)
+        }
+        if currentSessions.isEmpty, !snapshot.isEmpty {
+            currentSessions.append(UsageSessionMetric(
+                id: "claude-active-session",
+                name: "this session",
+                cost: snapshot.activeSessionCost,
+                tokens: snapshot.activeSessionTokens,
+                last: Date()
+            ))
+        }
+
+        return ProviderUsageSnapshot(
+            provider: .claude,
+            limits: usageLimits,
+            stats: stats,
+            todayCost: snapshot.isEmpty ? nil : snapshot.costToday,
+            todayTokens: snapshot.isEmpty ? nil : snapshot.tokensToday,
+            lifetimeCost: lifetime.tokens == 0 ? nil : lifetime.cost,
+            lifetimeTokens: lifetime.tokens == 0 ? nil : lifetime.tokens,
+            dailySeries: claudeDailySeries,
+            chartTitle: "last 7 days · local",
+            chartOnDetailPage: true,
+            sessionsTitle: "active sessions",
+            sessions: currentSessions,
+            alternateSessionsTitle: "all-time · top projects",
+            alternateSessions: lifetime.projects.map {
+                UsageSessionMetric(id: $0.id, name: $0.name, cost: $0.cost,
+                                   tokens: $0.tokens, last: $0.last)
+            },
+            planName: planName,
+            source: claudeUsageSource,
+            fetchedAt: limits?.fetchedAt
+        )
+    }
+
     private var home: URL { FileManager.default.homeDirectoryForCurrentUser }
     private var usageFileURL: URL { home.appendingPathComponent(".claude/notch-usage.json") }
     private var configURL: URL { home.appendingPathComponent(".claude.json") }
@@ -134,8 +232,12 @@ final class AppModel {
         limitsTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.fetchLimits() }
         }
+        codexTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.fetchCodexUsage() }
+        }
         Task { await ingest(ClaudePaths.recentLogFiles(within: 2)) }
         fetchLimits()
+        fetchCodexUsage()
         scanLifetime()
         lifetimeTimer = Timer.scheduledTimer(withTimeInterval: 600, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.scanLifetime() }
@@ -151,7 +253,28 @@ final class AppModel {
         }
     }
 
-    func togglePause() { isPaused.toggle(); if !isPaused { refresh() } }
+    func togglePause() {
+        isPaused.toggle()
+        if !isPaused {
+            refresh()
+            fetchLimits()
+            fetchCodexUsage()
+        }
+    }
+    func selectProvider(_ provider: UsageProviderID) {
+        selectedProvider = provider
+        UserDefaults.standard.set(provider.rawValue, forKey: "selectedProvider")
+        switch provider {
+        case .claude: fetchLimits()
+        case .codex: fetchCodexUsage()
+        }
+    }
+    /// Advance to the next provider (icon click) — with two providers this is a toggle.
+    func cycleProvider() {
+        let providers = UsageProviderID.allCases
+        guard let index = providers.firstIndex(of: selectedProvider) else { return }
+        selectProvider(providers[(index + 1) % providers.count])
+    }
     func cycleAvatar() { setAvatar(avatarStyle.next) }
     func setAvatar(_ s: AvatarStyle) { avatarStyle = s; AvatarStyle.selected = s }
     func toggleAnimateIcon() {
@@ -167,8 +290,16 @@ final class AppModel {
     /// Only replaces the last-known-good limits with a response that actually carries a
     /// session %, so a partial/failed read can never clobber correct data.
     func fetchLimits() {
+        guard !isPaused, selectedProvider == .claude else { return }
         Task { [claudeAPI] in
             if let l = await claudeAPI.fetch(), l.sessionPct != nil { self.applyLimits(l) }
+        }
+    }
+
+    func fetchCodexUsage() {
+        guard !isPaused, selectedProvider == .codex else { return }
+        Task { [codexProvider] in
+            self.codexSnapshot = await codexProvider.fetch()
         }
     }
 
@@ -227,6 +358,30 @@ final class AppModel {
     func refresh() {
         snapshot = store.snapshot(now: Date(), titles: titlesBySession)
         readStatusFeed()
+        claudeDailySeries = buildClaudeDailySeries()
+    }
+
+    /// The scanner aggregates whole days every ten minutes; today's bar is overridden with the
+    /// live figures so it never lags. Empty until either source has something to show.
+    private func buildClaudeDailySeries() -> [DailyUsagePoint] {
+        guard !lifetime.recentDays.isEmpty || !snapshot.isEmpty else { return [] }
+        let calendar = Calendar.current
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        let now = Date()
+        return (0..<7).reversed().compactMap { back in
+            guard let day = calendar.date(byAdding: .day, value: -back, to: now) else { return nil }
+            let key = f.string(from: day)
+            var tokens = lifetime.recentDays[key]?.tokens ?? 0
+            var cost = lifetime.recentDays[key]?.cost ?? 0
+            if back == 0 {
+                tokens = max(tokens, snapshot.tokensToday)
+                cost = max(cost, snapshot.costToday)
+            }
+            return DailyUsagePoint(date: day, tokens: tokens, cost: cost)
+        }
     }
 
     /// Expanded drop-down height — fixed, since the expanded view is a fixed-size two-page pager.

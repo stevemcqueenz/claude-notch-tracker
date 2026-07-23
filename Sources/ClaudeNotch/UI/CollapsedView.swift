@@ -19,12 +19,13 @@ enum Fmt {
         let m = max(0, Int(t) / 60)
         return m >= 60 ? "\(m / 60)h \(String(format: "%02d", m % 60))m" : "\(m)m"
     }
-    /// "4s" / "2m" / "1h" — compact age of a timestamp.
+    /// "4s" / "2m" / "1h" / "2d" — compact age of a timestamp.
     static func ago(_ date: Date) -> String {
         let s = max(0, Int(-date.timeIntervalSinceNow))
         if s < 60 { return "\(s)s" }
         if s < 3600 { return "\(s / 60)m" }
-        return "\(s / 3600)h"
+        if s < 86_400 { return "\(s / 3600)h" }
+        return "\(s / 86_400)d"
     }
     static func tokens(_ n: Int) -> String {
         switch n {

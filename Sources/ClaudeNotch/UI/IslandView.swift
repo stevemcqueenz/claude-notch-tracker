@@ -39,7 +39,25 @@ struct IslandView: View {
     private var closedH: CGFloat { max(topInset, 30) }
     private var gap: CGFloat { notchWidth }
     private var closedWidth: CGFloat { wing + gap + wing + edgeInset * 2 }
-    private var used: Double { model.sessionUsage ?? 0 }
+    private var provider: ProviderUsageSnapshot { model.activeProviderSnapshot }
+    private var used: Double { provider.primaryUsage ?? 0 }
+    /// Loaded once — this is read on every render of the closed row, and hitting the disk per
+    /// frame during animations would be pure waste. MainActor because NSImage isn't Sendable.
+    @MainActor private static let codexIcon: NSImage? = {
+        if let resourcesURL = Bundle.main.resourceURL,
+           let packagedBundle = Bundle(
+               url: resourcesURL.appendingPathComponent("ClaudeNotch_ClaudeNotch.bundle")
+           ),
+           let url = packagedBundle.url(forResource: "codex", withExtension: "png"),
+           let image = NSImage(contentsOf: url) {
+            return image
+        }
+
+        guard let url = Bundle.module.url(forResource: "codex", withExtension: "png") else {
+            return nil
+        }
+        return NSImage(contentsOf: url)
+    }()
 
     var body: some View {
         let shape = NotchShape(topRadius: 8,
@@ -59,12 +77,29 @@ struct IslandView: View {
         .clipShape(shape)
         .contentShape(shape)
         .contextMenu { menu }
+        .onChange(of: model.selectedProvider) { _, _ in
+            showAllTime = false
+            page = 0
+        }
         .animation(.spring(response: 0.6, dampingFraction: 1.0), value: expanded)
         .animation(.easeInOut(duration: 0.3), value: used)
     }
 
     // Right-click menu (replaces the menu-bar item).
     @ViewBuilder private var menu: some View {
+        Menu("Provider") {
+            ForEach(UsageProviderID.allCases) { provider in
+                Button {
+                    model.selectProvider(provider)
+                } label: {
+                    if model.selectedProvider == provider {
+                        Label(provider.displayName, systemImage: "checkmark")
+                    } else {
+                        Text(provider.displayName)
+                    }
+                }
+            }
+        }
         Menu("Icon") {
             ForEach(AvatarStyle.allCases) { style in
                 Button {
@@ -94,17 +129,25 @@ struct IslandView: View {
 
     private var notchRow: some View {
         HStack(spacing: 0) {
-            AvatarView(style: model.avatarStyle, active: model.animateIcon && !model.isPaused && !model.isAtLimit,
-                       urgency: model.iconUrgency)
+            providerIcon
                 .frame(width: iconSize, height: iconSize)
                 .frame(width: wing, height: closedH)
-                .onTapGesture { model.cycleAvatar() }
-                .help("Click to change the icon")
+                .contentShape(Rectangle())
+                // Tap switches provider (Claude ⇄ Codex); the Claude icon style is picked from
+                // the right-click Icon menu.
+                .onTapGesture { model.cycleProvider() }
+                .help("Click to switch provider")
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Switch provider")
+                .accessibilityValue(model.selectedProvider.displayName)
+                .accessibilityHint("Switches between Claude and Codex")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityInputLabels(["Switch provider", model.selectedProvider.displayName])
 
             Color.clear.frame(width: gap, height: closedH)
 
             HStack(spacing: 5) {
-                Text(model.sessionUsage.map(Fmt.pct) ?? "—")
+                Text(provider.primaryUsage.map(Fmt.pct) ?? "—")
                     .font(.system(size: 12, weight: .semibold)).monospacedDigit()
                     .foregroundStyle(.white)
                 Ring(fraction: used, state: ringState(for: used), lineWidth: 3)
@@ -116,6 +159,33 @@ struct IslandView: View {
             .onTapGesture { model.isExpanded.toggle() }
         }
         .padding(.horizontal, edgeInset)
+    }
+
+    @ViewBuilder private var providerIcon: some View {
+        if model.selectedProvider == .claude {
+            AvatarView(style: model.avatarStyle,
+                       active: model.animateIcon && !model.isPaused && !model.isAtLimit,
+                       urgency: model.iconUrgency)
+        } else if let icon = Self.codexIcon {
+            CodexIconView(
+                image: icon,
+                active: model.animateIcon && !model.isPaused && !model.isAtLimit,
+                urgency: model.iconUrgency
+            )
+            .opacity(model.isPaused ? 0.45 : 0.9)
+        } else if let symbol = NSImage(
+            systemSymbolName: model.selectedProvider.systemImage,
+            accessibilityDescription: model.selectedProvider.displayName
+        ) {
+            Image(nsImage: symbol)
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(.white.opacity(model.isPaused ? 0.45 : 0.9))
+        } else {
+            Text("C")
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(.white.opacity(model.isPaused ? 0.45 : 0.9))
+        }
     }
 
     // MARK: drop-down — two swipeable pages below the notch
@@ -161,24 +231,37 @@ struct IslandView: View {
         .frame(height: 8)
     }
 
-    // Page 1 — account limits (these cover ALL usage, incl. cloud) + local "today" tiles.
+    // Page 1 — provider-defined account limits and summary metrics.
     private var pageLimits: some View {
-        let s = model.snapshot
+        let snapshot = provider
+        // With a daily feed, the page is limits + the week chart as centerpiece; the plain
+        // six-tile grid remains for providers/accounts without one (API-key Codex) and for
+        // providers that keep the chart on the detail page (Claude, whose limit tiles fill this
+        // one). More than two limit windows also falls back — the windows outrank the chart.
+        let chartLayout = chartOnLimitsPage
+        let gridSlots = chartLayout ? 2 : 6
+        let remainingSlots = max(0, gridSlots - snapshot.limits.count)
         return VStack(spacing: 8) {
             LazyVGrid(columns: [.init(.flexible(), spacing: 8), .init(.flexible(), spacing: 8)], spacing: 8) {
-                limitTile("5-Hour", model.sessionUsage, resets: model.sessionResetsAt,
-                          eta: prefReset ? nil : model.etaToLimit)
-                    .contentShape(Rectangle())
-                    .onTapGesture { if model.etaToLimit != nil { prefReset.toggle() } }
-                limitTile("7-Day", model.weeklyUsage, resets: model.weeklyResetsAt)
-                fableTile
-                tile("cost today · local", s.isEmpty ? "—" : Fmt.usd(s.costToday), height: .compact,
-                     sub: model.projectedCostToday.map { "~\(Fmt.usd($0)) by tonight" })
-                tile("tokens today · local", s.isEmpty ? "—" : Fmt.tokens(s.tokensToday), height: .compact)
-                tile("credits", model.creditsValue, height: .compact, sub: model.creditsSubtitle)
+                ForEach(Array(snapshot.limits.prefix(gridSlots))) { metric in
+                    providerLimitTile(metric)
+                }
+                ForEach(Array(snapshot.stats.prefix(remainingSlots))) { metric in
+                    tile(metric.label, metric.value, height: .compact, sub: metric.subtitle)
+                }
             }
             .opacity(model.isStale ? 0.55 : 1)         // dim live limits when not fresh
-            if model.isStale {                          // only surface a problem, never chrome
+            if chartLayout {
+                WeekActivityChart(series: snapshot.dailySeries, title: snapshot.chartTitle)
+                    .opacity(model.isStale ? 0.55 : 1)
+            }
+            if let message = snapshot.statusMessage {
+                Spacer(minLength: 0)
+                Text(message).font(.system(size: 10))
+                    .foregroundStyle(Color(red: 0.96, green: 0.70, blue: 0.20))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .lineLimit(1).truncationMode(.tail)
+            } else if model.isStale {                   // only surface a problem, never chrome
                 Spacer(minLength: 0)
                 Text("reconnecting…").font(.system(size: 10))
                     .foregroundStyle(Color(red: 0.96, green: 0.70, blue: 0.20))
@@ -187,27 +270,55 @@ struct IslandView: View {
         }
     }
 
-    // Page 2 — local detail: today vs all-time spend, and the running conversations.
+    /// True when the limits page hosts the week chart (Codex-style); the detail page then keeps
+    /// its stat tiles. When false and a series exists (Claude), the chart lives on the detail page.
+    private var chartOnLimitsPage: Bool {
+        let s = provider
+        return !s.dailySeries.isEmpty && !s.chartOnDetailPage && s.limits.count <= 2
+    }
+
+    // Page 2 — provider detail: the week chart (when page 1 is full of limit tiles) or the
+    // today/all-time totals, above recent sessions/tasks.
     private var pageLocal: some View {
-        let s = model.snapshot
+        let snapshot = provider
+        let chartHere = !snapshot.dailySeries.isEmpty && !chartOnLimitsPage
+        // A bare "today: —" tile is dead weight. When the provider has no today figure but does
+        // have a daily feed, show the week total instead — always a real number.
+        let showWeek = snapshot.todayCost == nil && snapshot.todayTokens == nil
+            && snapshot.weekTokens != nil
+        // "peak 501.5M" beats the word "tokens" under the all-time figure, when known.
+        let peakDetail = snapshot.stats.first(where: { $0.id == "peak-day" })
+            .map { "peak \($0.value)" }
         return VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                statTile("today", cost: s.costToday, tokens: s.tokensToday, dim: s.isEmpty)
-                statTile("all-time", cost: model.lifetime.cost, tokens: model.lifetime.tokens,
-                         dim: model.lifetime.tokens == 0)
+            if chartHere {
+                WeekActivityChart(series: snapshot.dailySeries, title: snapshot.chartTitle)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                HStack(spacing: 8) {
+                    if showWeek {
+                        statTile("this week · account", cost: nil, tokens: snapshot.weekTokens)
+                    } else {
+                        statTile("today", cost: snapshot.todayCost, tokens: snapshot.todayTokens)
+                    }
+                    statTile("all-time", cost: snapshot.lifetimeCost, tokens: snapshot.lifetimeTokens,
+                             detail: peakDetail)
+                }
             }
             sessionsBlock
             Spacer(minLength: 0)
         }
     }
 
-    private func statTile(_ label: String, cost: Double, tokens: Int, dim: Bool) -> some View {
+    private func statTile(_ label: String, cost: Double?, tokens: Int?,
+                          detail: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label).font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
                 .lineLimit(1).minimumScaleFactor(0.8)
-            Text(dim ? "—" : Fmt.usd(cost)).font(.system(size: 15, weight: .semibold)).monospacedDigit()
+            Text(summaryPrimary(cost: cost, tokens: tokens))
+                .font(.system(size: 15, weight: .semibold)).monospacedDigit()
                 .foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.6)
-            Text(dim ? " " : Fmt.tokens(tokens)).font(.system(size: 9.5)).monospacedDigit()
+            Text(detail ?? summarySecondary(cost: cost, tokens: tokens))
+                .font(.system(size: 9.5)).monospacedDigit()
                 .foregroundStyle(.white.opacity(0.45)).lineLimit(1).minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity, minHeight: 54, alignment: .topLeading)
@@ -215,43 +326,48 @@ struct IslandView: View {
         .background(Color.white.opacity(0.06)).clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
-    // Tap to flip between today's active conversations and the biggest projects of all time.
+    private func summaryPrimary(cost: Double?, tokens: Int?) -> String {
+        if let cost { return Fmt.usd(cost) }
+        if let tokens { return Fmt.tokens(tokens) }
+        return "—"
+    }
+
+    private func summarySecondary(cost: Double?, tokens: Int?) -> String {
+        if cost != nil, let tokens { return Fmt.tokens(tokens) }
+        if tokens != nil { return "tokens" }
+        return " "
+    }
+
+    // Tap to flip between the provider's primary and alternate session lists when both exist.
     private var sessionsBlock: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let snapshot = provider
+        let hasAlternate = snapshot.alternateSessionsTitle != nil
+        let showingAlternate = showAllTime && hasAlternate
+        let title = showingAlternate ? snapshot.alternateSessionsTitle! : snapshot.sessionsTitle
+        let sessions = showingAlternate ? snapshot.alternateSessions : snapshot.sessions
+        return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
-                Text(showAllTime ? "all-time · top projects" : "active sessions")
+                Text(title)
                     .font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
                 Spacer()
-                // Tap hint: shows the other view you'll switch to.
-                HStack(spacing: 3) {
-                    Image(systemName: "arrow.left.arrow.right").font(.system(size: 8, weight: .semibold))
-                    Text(showAllTime ? "active" : "all-time").font(.system(size: 9, weight: .medium))
+                if hasAlternate {
+                    HStack(spacing: 3) {
+                        Image(systemName: "arrow.left.arrow.right").font(.system(size: 8, weight: .semibold))
+                        Text(showingAlternate ? snapshot.sessionsTitle : snapshot.alternateSessionsTitle!)
+                            .font(.system(size: 9, weight: .medium)).lineLimit(1)
+                    }
+                    .foregroundStyle(.white.opacity(0.5))
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(Color.white.opacity(0.09))
+                    .clipShape(Capsule())
                 }
-                .foregroundStyle(.white.opacity(0.5))
-                .padding(.horizontal, 6).padding(.vertical, 2)
-                .background(Color.white.opacity(0.09))
-                .clipShape(Capsule())
             }
-            if showAllTime {
-                let projects = Array(model.lifetime.projects.prefix(3))
-                if projects.isEmpty {
-                    Text("scanning…").font(.system(size: 12)).foregroundStyle(.white.opacity(0.4))
-                        .frame(minHeight: 20)
-                } else {
-                    ForEach(projects) { p in
-                        sessionRow(p.name, cost: p.cost, tokens: p.tokens, muted: false, empty: false)
-                    }
-                }
+            if sessions.isEmpty {
+                sessionRow("No recent activity", cost: nil, tokens: nil, last: nil, muted: true)
             } else {
-                let sessions = Array(model.sessionsToday.prefix(3))
-                if sessions.isEmpty {
-                    let s = model.snapshot
-                    sessionRow("this session", cost: s.activeSessionCost, tokens: s.activeSessionTokens,
-                               muted: true, empty: s.isEmpty)
-                } else {
-                    ForEach(sessions) { s in
-                        sessionRow(s.name, cost: s.cost, tokens: s.tokens, muted: false, empty: false)
-                    }
+                ForEach(Array(sessions.prefix(3))) { session in
+                    sessionRow(session.name, cost: session.cost, tokens: session.tokens,
+                               last: session.last, muted: false)
                 }
             }
         }
@@ -259,41 +375,45 @@ struct IslandView: View {
         .padding(.horizontal, 12).padding(.vertical, 10)
         .background(Color.white.opacity(0.06)).clipShape(RoundedRectangle(cornerRadius: 10))
         .contentShape(Rectangle())
-        .onTapGesture { showAllTime.toggle() }
-        .help("Click to switch active sessions / all-time")
+        .onTapGesture { if hasAlternate { showAllTime.toggle() } }
+        .help(hasAlternate ? "Click to switch session views" : "Recent provider activity")
     }
 
-    private var shortPlan: String {
-        (model.planName ?? "Claude").replacingOccurrences(of: "Claude ", with: "")
-    }
-
-    // Fable's own weekly limit (the Desktop app shows it). Falls back to accumulated local usage
-    // until the account's usage response actually carries the Fable weekly figure.
-    @ViewBuilder private var fableTile: some View {
-        if let pct = model.fableUsage {
-            limitTile("Fable", pct, resets: model.fableResetsAt)
-        } else {
-            tile("Fable", model.lifetime.fableTokens == 0 ? "—" : Fmt.tokens(model.lifetime.fableTokens),
-                 height: .compact, sub: "all-time")
-        }
-    }
-
-    private func sessionRow(_ project: String, cost: Double, tokens: Int,
-                            muted: Bool, empty: Bool) -> some View {
+    private func sessionRow(_ project: String, cost: Double?, tokens: Int?, last: Date?,
+                            muted: Bool) -> some View {
         HStack(spacing: 6) {
             Text(project).font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.white.opacity(muted ? 0.5 : 0.85)).lineLimit(1).truncationMode(.tail)
             Spacer(minLength: 8)
-            if empty {
-                Text("—").font(.system(size: 12, weight: .medium)).foregroundStyle(.white.opacity(0.4))
-            } else {
+            if let cost, let tokens {
                 (Text(Fmt.usd(cost)).foregroundStyle(.white)
                     + Text("  ·  \(Fmt.tokens(tokens))").foregroundStyle(.white.opacity(0.45)))
                     .font(.system(size: 12, weight: .semibold)).monospacedDigit()
                     .lineLimit(1).minimumScaleFactor(0.7)
+            } else if let tokens {
+                Text(Fmt.tokens(tokens)).foregroundStyle(.white)
+                    .font(.system(size: 12, weight: .semibold)).monospacedDigit()
+            } else if let cost {
+                Text(Fmt.usd(cost)).foregroundStyle(.white)
+                    .font(.system(size: 12, weight: .semibold)).monospacedDigit()
+            } else if let last {
+                Text(Fmt.ago(last)).font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.45)).monospacedDigit()
+            } else {
+                Text("—").font(.system(size: 12, weight: .medium)).foregroundStyle(.white.opacity(0.4))
             }
         }
         .frame(minHeight: 20)
+    }
+
+    @ViewBuilder private func providerLimitTile(_ metric: UsageLimitMetric) -> some View {
+        let isClaudeSession = metric.id == "claude-session"
+        limitTile(metric.label, metric.usedFraction, resets: metric.resetsAt,
+                  eta: isClaudeSession && !prefReset ? model.etaToLimit : nil)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if isClaudeSession, model.etaToLimit != nil { prefReset.toggle() }
+            }
     }
 
     // A limit tile: label, big colour-coded %, and a "resets in …" subline.

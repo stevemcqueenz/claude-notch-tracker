@@ -9,9 +9,9 @@
 	<key>CFBundleIdentifier</key>
 	<string>com.claudenotch.app</string>
 	<key>CFBundleVersion</key>
-	<string>0.2.1</string>
+	<string>0.3.0</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.2.1</string>
+	<string>0.3.0</string>
 	<key>CFBundleExecutable</key>
 	<string>ClaudeNotch</string>
 	<key>CFBundlePackageType</key>
@@ -23,7 +23,7 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>Made with Claude. Clawd crab animation © Mick Cesanek (MIT).</string>
+	<string>Claude &amp; Codex usage companion. Made with Claude. Clawd crab animation © Mick Cesanek (MIT).</string>
 	<key>SUFeedURL</key>
 	<string>https://stevemcqueenz.github.io/claude-notch-tracker/appcast.xml</string>
 	<key>SUPublicEDKey</key>

@@ -38,6 +38,14 @@ cp "$BIN" "$APPDIR/Contents/MacOS/ClaudeNotch"
 cp "$ROOT/Resources/Info.plist" "$APPDIR/Contents/Info.plist"
 cp "$ROOT/Resources/AppIcon.icns" "$APPDIR/Contents/Resources/AppIcon.icns"
 
+# Preserve SwiftPM's resource bundle inside the conventional app resources directory.
+# Resolved via the same .build/release products path as BIN above — SwiftPM keeps that as a
+# symlink into the real products dir on every toolchain layout, whereas find(1) won't follow
+# the symlink and misses the bundle on toolchains that build into .build/out/Products/Release.
+RESOURCE_BUNDLE="$ROOT/.build/release/ClaudeNotch_ClaudeNotch.bundle"
+[ -d "$RESOURCE_BUNDLE" ] || { echo "✗ ClaudeNotch resource bundle not found at $RESOURCE_BUNDLE"; exit 1; }
+ditto "$RESOURCE_BUNDLE" "$APPDIR/Contents/Resources/ClaudeNotch_ClaudeNotch.bundle"
+
 # Embed Sparkle.framework (SwiftPM builds it as an xcframework) + let the binary find it.
 SPARKLE_FW="$(find "$ROOT/.build/artifacts" -path "*macos-arm64_x86_64/Sparkle.framework" -type d 2>/dev/null | head -1)"
 [ -d "$SPARKLE_FW" ] || { echo "✗ Sparkle.framework not found — run 'swift build' first"; exit 1; }
