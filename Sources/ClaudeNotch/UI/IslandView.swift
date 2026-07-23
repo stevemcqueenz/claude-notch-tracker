@@ -235,9 +235,10 @@ struct IslandView: View {
     private var pageLimits: some View {
         let snapshot = provider
         // With a daily feed, the page is limits + the week chart as centerpiece; the plain
-        // six-tile grid remains for providers/accounts without one (Claude, API-key Codex).
-        // More than two limit windows also falls back — the windows outrank the chart.
-        let chartLayout = !snapshot.dailySeries.isEmpty && snapshot.limits.count <= 2
+        // six-tile grid remains for providers/accounts without one (API-key Codex) and for
+        // providers that keep the chart on the detail page (Claude, whose limit tiles fill this
+        // one). More than two limit windows also falls back — the windows outrank the chart.
+        let chartLayout = chartOnLimitsPage
         let gridSlots = chartLayout ? 2 : 6
         let remainingSlots = max(0, gridSlots - snapshot.limits.count)
         return VStack(spacing: 8) {
@@ -251,7 +252,7 @@ struct IslandView: View {
             }
             .opacity(model.isStale ? 0.55 : 1)         // dim live limits when not fresh
             if chartLayout {
-                WeekActivityChart(series: snapshot.dailySeries)
+                WeekActivityChart(series: snapshot.dailySeries, title: snapshot.chartTitle)
                     .opacity(model.isStale ? 0.55 : 1)
             }
             if let message = snapshot.statusMessage {
@@ -269,9 +270,18 @@ struct IslandView: View {
         }
     }
 
-    // Page 2 — provider detail: today vs all-time totals and recent sessions/tasks.
+    /// True when the limits page hosts the week chart (Codex-style); the detail page then keeps
+    /// its stat tiles. When false and a series exists (Claude), the chart lives on the detail page.
+    private var chartOnLimitsPage: Bool {
+        let s = provider
+        return !s.dailySeries.isEmpty && !s.chartOnDetailPage && s.limits.count <= 2
+    }
+
+    // Page 2 — provider detail: the week chart (when page 1 is full of limit tiles) or the
+    // today/all-time totals, above recent sessions/tasks.
     private var pageLocal: some View {
         let snapshot = provider
+        let chartHere = !snapshot.dailySeries.isEmpty && !chartOnLimitsPage
         // A bare "today: —" tile is dead weight. When the provider has no today figure but does
         // have a daily feed, show the week total instead — always a real number.
         let showWeek = snapshot.todayCost == nil && snapshot.todayTokens == nil
@@ -280,14 +290,19 @@ struct IslandView: View {
         let peakDetail = snapshot.stats.first(where: { $0.id == "peak-day" })
             .map { "peak \($0.value)" }
         return VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                if showWeek {
-                    statTile("this week · account", cost: nil, tokens: snapshot.weekTokens)
-                } else {
-                    statTile("today", cost: snapshot.todayCost, tokens: snapshot.todayTokens)
+            if chartHere {
+                WeekActivityChart(series: snapshot.dailySeries, title: snapshot.chartTitle)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                HStack(spacing: 8) {
+                    if showWeek {
+                        statTile("this week · account", cost: nil, tokens: snapshot.weekTokens)
+                    } else {
+                        statTile("today", cost: snapshot.todayCost, tokens: snapshot.todayTokens)
+                    }
+                    statTile("all-time", cost: snapshot.lifetimeCost, tokens: snapshot.lifetimeTokens,
+                             detail: peakDetail)
                 }
-                statTile("all-time", cost: snapshot.lifetimeCost, tokens: snapshot.lifetimeTokens,
-                         detail: peakDetail)
             }
             sessionsBlock
             Spacer(minLength: 0)

@@ -35,6 +35,9 @@ final class AppModel {
 
     /// Lifetime tokens + cost across every log (scanned off-main, refreshed periodically).
     private(set) var lifetime: LifetimeScanner.Totals = .init()
+    /// Local per-day activity for the week chart (scanner data, today overridden live).
+    /// Recomputed on each refresh() tick rather than per render.
+    private(set) var claudeDailySeries: [DailyUsagePoint] = []
 
     private let store = UsageStore()
     private let loader = LogLoader()
@@ -157,11 +160,13 @@ final class AppModel {
             UsageStatMetric(id: "cost-today", label: "cost today · local",
                             value: snapshot.isEmpty ? "—" : Fmt.usd(snapshot.costToday),
                             subtitle: projectedCostToday.map { "~\(Fmt.usd($0)) by tonight" }),
-            UsageStatMetric(id: "tokens-today", label: "tokens today · local",
-                            value: snapshot.isEmpty ? "—" : Fmt.tokens(snapshot.tokensToday),
-                            subtitle: nil),
             UsageStatMetric(id: "credits", label: "credits",
                             value: creditsValue, subtitle: creditsSubtitle),
+            // All-time lives here now; the detail page belongs to the week chart + sessions,
+            // and "tokens today" is redundant with the chart's highlighted today bar.
+            UsageStatMetric(id: "all-time", label: "all-time · local",
+                            value: lifetime.tokens == 0 ? "—" : Fmt.usd(lifetime.cost),
+                            subtitle: lifetime.tokens == 0 ? nil : Fmt.tokens(lifetime.tokens)),
         ]
         if fableUsage == nil {
             stats.insert(
@@ -194,6 +199,9 @@ final class AppModel {
             todayTokens: snapshot.isEmpty ? nil : snapshot.tokensToday,
             lifetimeCost: lifetime.tokens == 0 ? nil : lifetime.cost,
             lifetimeTokens: lifetime.tokens == 0 ? nil : lifetime.tokens,
+            dailySeries: claudeDailySeries,
+            chartTitle: "last 7 days · local",
+            chartOnDetailPage: true,
             sessionsTitle: "active sessions",
             sessions: currentSessions,
             alternateSessionsTitle: "all-time · top projects",
@@ -350,6 +358,30 @@ final class AppModel {
     func refresh() {
         snapshot = store.snapshot(now: Date(), titles: titlesBySession)
         readStatusFeed()
+        claudeDailySeries = buildClaudeDailySeries()
+    }
+
+    /// The scanner aggregates whole days every ten minutes; today's bar is overridden with the
+    /// live figures so it never lags. Empty until either source has something to show.
+    private func buildClaudeDailySeries() -> [DailyUsagePoint] {
+        guard !lifetime.recentDays.isEmpty || !snapshot.isEmpty else { return [] }
+        let calendar = Calendar.current
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        let now = Date()
+        return (0..<7).reversed().compactMap { back in
+            guard let day = calendar.date(byAdding: .day, value: -back, to: now) else { return nil }
+            let key = f.string(from: day)
+            var tokens = lifetime.recentDays[key]?.tokens ?? 0
+            var cost = lifetime.recentDays[key]?.cost ?? 0
+            if back == 0 {
+                tokens = max(tokens, snapshot.tokensToday)
+                cost = max(cost, snapshot.costToday)
+            }
+            return DailyUsagePoint(date: day, tokens: tokens, cost: cost)
+        }
     }
 
     /// Expanded drop-down height — fixed, since the expanded view is a fixed-size two-page pager.

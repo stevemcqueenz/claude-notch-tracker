@@ -195,6 +195,7 @@ enum CodexSnapshotMapper {
             todayTokens: todayTokens,
             lifetimeTokens: lifetimeTokens,
             dailySeries: series,
+            chartTitle: "last 7 days · account",
             sessionsTitle: "recent tasks",
             sessions: sessions,
             planName: planName,

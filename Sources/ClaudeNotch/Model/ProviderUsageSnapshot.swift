@@ -50,10 +50,12 @@ struct UsageSessionMetric: Equatable, Sendable, Identifiable {
     let last: Date
 }
 
-/// One day of account-level token usage, for the limits-page activity chart.
+/// One day of activity for the week chart. `cost` set (Claude's local logs) makes the chart
+/// render dollars; otherwise it renders `tokens` (Codex's account feed).
 struct DailyUsagePoint: Equatable, Sendable, Identifiable {
     let date: Date
     let tokens: Int
+    var cost: Double? = nil
     var id: Date { date }
 }
 
@@ -66,8 +68,12 @@ struct ProviderUsageSnapshot: Equatable, Sendable {
     var lifetimeCost: Double?
     var lifetimeTokens: Int?
     /// Oldest-first, one point per calendar day (7 for a week view); empty = no daily feed, and
-    /// the limits page falls back to a plain tile grid.
+    /// the pages fall back to plain tile layouts.
     var dailySeries: [DailyUsagePoint] = []
+    var chartTitle = "last 7 days"
+    /// True = the chart belongs on the detail page (Claude: the limits page is full of limit
+    /// tiles); false = it may take over the limits page (Codex: one or two windows).
+    var chartOnDetailPage = false
     var sessionsTitle = "active sessions"
     var sessions: [UsageSessionMetric] = []
     var alternateSessionsTitle: String?

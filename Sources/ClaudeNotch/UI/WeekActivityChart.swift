@@ -5,24 +5,33 @@ import SwiftUI
 /// whatever height the page gives it, so it works as the page's centerpiece tile.
 struct WeekActivityChart: View {
     let series: [DailyUsagePoint]   // oldest first, today last
+    var title = "last 7 days"
 
-    private var total: Int { series.reduce(0) { $0 + $1.tokens } }
-    private var maxTokens: Int { series.map(\.tokens).max() ?? 0 }
+    /// Dollar mode when any point carries a cost (Claude's local logs); token mode otherwise.
+    private var usesCost: Bool { series.contains { ($0.cost ?? 0) > 0 } }
+    private func value(_ point: DailyUsagePoint) -> Double {
+        usesCost ? (point.cost ?? 0) : Double(point.tokens)
+    }
+    private func label(_ value: Double) -> String {
+        usesCost ? Fmt.usd(value) : Fmt.tokens(Int(value))
+    }
+    private var total: Double { series.reduce(0) { $0 + value($1) } }
+    private var maxValue: Double { series.map(value).max() ?? 0 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("last 7 days · account").font(.system(size: 10))
+                Text(title).font(.system(size: 10))
                     .foregroundStyle(.white.opacity(0.5))
                 Spacer()
                 if total > 0 {
-                    Text(Fmt.tokens(total)).font(.system(size: 10, weight: .semibold)).monospacedDigit()
+                    Text(label(total)).font(.system(size: 10, weight: .semibold)).monospacedDigit()
                         .foregroundStyle(.white.opacity(0.7))
                 }
             }
-            if maxTokens == 0 {
+            if maxValue == 0 {
                 Spacer(minLength: 0)
-                Text("no account activity this week")
+                Text("no activity this week")
                     .font(.system(size: 11)).foregroundStyle(.white.opacity(0.35))
                     .frame(maxWidth: .infinity)
                 Spacer(minLength: 0)
@@ -52,20 +61,21 @@ struct WeekActivityChart: View {
     }
 
     private func bar(_ point: DailyUsagePoint, available: CGFloat) -> some View {
-        let fraction = maxTokens > 0 ? Double(point.tokens) / Double(maxTokens) : 0
-        let isPeak = point.tokens == maxTokens && point.tokens > 0
+        let v = value(point)
+        let fraction = maxValue > 0 ? v / maxValue : 0
+        let isPeak = v == maxValue && v > 0
         // ~12pt stays reserved for the peak label so the tallest bar never collides with it.
         let barHeight = max(3, (available - 14) * fraction)
         return VStack(spacing: 2) {
             Spacer(minLength: 0)
             if isPeak {
-                Text(Fmt.tokens(point.tokens))
+                Text(label(v))
                     .font(.system(size: 8.5, weight: .semibold)).monospacedDigit()
                     .foregroundStyle(.white.opacity(0.8))
                     .lineLimit(1).fixedSize()
             }
             RoundedRectangle(cornerRadius: 2.5)
-                .fill(.white.opacity(point.tokens == 0 ? 0.12 : (isToday(point.date) ? 0.9 : 0.4)))
+                .fill(.white.opacity(v == 0 ? 0.12 : (isToday(point.date) ? 0.9 : 0.4)))
                 .frame(height: barHeight)
         }
         .frame(maxWidth: .infinity)
