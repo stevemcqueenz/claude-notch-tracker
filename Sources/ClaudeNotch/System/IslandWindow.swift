@@ -32,11 +32,21 @@ final class PassthroughHostingView<Content: View>: NSHostingView<Content> {
     var interactiveRect: CGRect = .zero
     /// Cleared while the pill is retracted for fullscreen so a hidden pill can never claim a click.
     var interactionEnabled = true
+    /// Supplies the right-click menu. Built and popped up by hand because SwiftUI's `.contextMenu`
+    /// will not present from a panel that can't become key — see IslandContextMenu.swift.
+    var contextMenuBuilder: (() -> NSMenu)?
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard interactionEnabled, interactiveRect.contains(point) else { return nil }
         return super.hitTest(point)
     }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func rightMouseDown(with event: NSEvent) {
+        guard interactionEnabled, let menu = contextMenuBuilder?() else {
+            super.rightMouseDown(with: event)
+            return
+        }
+        menu.popUp(positioning: nil, at: convert(event.locationInWindow, from: nil), in: self)
+    }
 }
 
 /// A FIXED-size top-strip window. The pill animates its own height inside it — the window is
@@ -46,13 +56,16 @@ final class IslandWindow {
     private let panel: NotchPanel
     private let hosting: PassthroughHostingView<IslandRootView>
     private let model: AppModel
+    private let menuController: IslandMenuController
     private let panelHeight: CGFloat = 300
 
     init(model: AppModel) {
         self.model = model
+        menuController = IslandMenuController(model: model)
         hosting = PassthroughHostingView(rootView: IslandRootView(model: model))
         panel = NotchPanel(contentRect: NSRect(x: 0, y: 0, width: 400, height: panelHeight))
         panel.contentView = hosting
+        hosting.contextMenuBuilder = { [menuController] in menuController.makeMenu() }
     }
 
     /// Resting frame: the full-width strip flush to the top of the notched screen (or main).

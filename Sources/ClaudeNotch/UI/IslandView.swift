@@ -76,54 +76,14 @@ struct IslandView: View {
                alignment: .top)
         .clipShape(shape)
         .contentShape(shape)
-        .contextMenu { menu }
+        // The right-click menu is built in AppKit and popped up from PassthroughHostingView —
+        // SwiftUI's `.contextMenu` never presents from this non-key panel. See IslandContextMenu.swift.
         .onChange(of: model.selectedProvider) { _, _ in
             showAllTime = false
             page = 0
         }
         .animation(.spring(response: 0.6, dampingFraction: 1.0), value: expanded)
         .animation(.easeInOut(duration: 0.3), value: used)
-    }
-
-    // Right-click menu (replaces the menu-bar item).
-    @ViewBuilder private var menu: some View {
-        Menu("Provider") {
-            ForEach(UsageProviderID.allCases) { provider in
-                Button {
-                    model.selectProvider(provider)
-                } label: {
-                    if model.selectedProvider == provider {
-                        Label(provider.displayName, systemImage: "checkmark")
-                    } else {
-                        Text(provider.displayName)
-                    }
-                }
-            }
-        }
-        Menu("Icon") {
-            ForEach(AvatarStyle.allCases) { style in
-                Button {
-                    model.setAvatar(style)
-                } label: {
-                    if model.avatarStyle == style {
-                        Label(style.label, systemImage: "checkmark")
-                    } else {
-                        Text(style.label)
-                    }
-                }
-            }
-        }
-        Button("Refresh now") { model.refreshNow() }
-        Button(model.isPaused ? "Resume tracking" : "Pause tracking") { model.togglePause() }
-        Button((model.animateIcon ? "✓ " : "") + "Animate icon") { model.toggleAnimateIcon() }
-        Button((model.hideInFullscreen ? "✓ " : "") + "Hide in full screen") { model.toggleHideInFullscreen() }
-        Button((LoginItem.isEnabled ? "✓ " : "") + "Launch at Login") { LoginItem.toggle() }
-        Divider()
-        Button("Check for Updates…") { Updater.shared.checkForUpdates() }
-        Divider()
-        Button("Claude Notch v\(AppInfo.version) — \(AppInfo.tagline)") {}.disabled(true)
-        Divider()
-        Button("Quit") { NSApp.terminate(nil) }
     }
 
     // MARK: closed row
