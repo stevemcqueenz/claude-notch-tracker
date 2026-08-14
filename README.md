@@ -1,8 +1,8 @@
 <div align="center">
 
-# 🦀 Claude & Codex Notch Usage Companion
+# 🦀 Claude, Codex & Antigravity Notch Usage Companion
 
-**Live Claude and Codex usage in your Mac's notch: limits, resets, tokens, and cost.**
+**Live Claude, Codex and Antigravity usage in your Mac's notch: limits, resets, tokens, and cost.**
 
 <img src="docs/demo.gif" width="640" alt="Claude Notch: click to expand, swipe between the limits and detail pages, and tap to switch active sessions or all-time" />
 
@@ -65,8 +65,10 @@ your spend and sessions sit behind. Click away and it glides shut. No Dock icon,
 - **Real limit tiles.** Your **5-hour** session, **7-day** weekly, *and* **Fable's own weekly
   limit**. Fable is metered separately, so you get the same three bars the Claude desktop app
   shows, each with a reset countdown and colour-coded urgency.
-- **Claude and Codex providers.** Click the left icon to switch providers. Codex windows, token
-  totals, credits, and recent tasks come from the official local `codex app-server` interface.
+- **Claude, Codex and Antigravity providers.** Click the left icon to cycle providers. Codex
+  windows, token totals, credits, and recent tasks come from the official local `codex app-server`
+  interface. Antigravity quota comes from the CLI's own read-only `/usage` command — which spends
+  no quota to ask — with tokens, models, and projects read from its local conversation stores.
 - **Two pages, one swipe.** Limits up front. Swipe (or tap the dots) to a local detail page with
   today versus all-time spend, plus your live sessions.
 - **Named sessions.** Your actual **conversation titles** from the sidebar, with today's spend per
@@ -107,13 +109,18 @@ permission via a Keychain prompt on first run.
 
 For Codex, Claude Notch starts the installed official `codex app-server` with fixed JSON-RPC
 requests. It does not parse private Codex session logs or estimate dollar costs. Raw prompt previews
-and account email addresses are not displayed or retained. See
+and account email addresses are not displayed or retained.
+
+For Antigravity, it runs the installed `agy` CLI with fixed arguments and reads its local
+conversation stores read-only. Prompts, transcripts and artifacts are never read — only per-turn
+token counts and the project folder name. See
 [Provider Architecture](docs/providers.md) for data sources and security boundaries.
 
 ## Requirements
 
 - macOS 14+ (Apple Silicon or Intel)
-- A signed-in Claude session, an authenticated Codex installation, or both
+- A signed-in Claude session, an authenticated Codex installation, an Antigravity CLI (`agy`)
+  login, or any combination
 
 ## Install
 
@@ -140,7 +147,7 @@ Command Line Tools.
 - **Click** the % or ring to expand, and **click away** to collapse.
 - **Swipe** left or right (or tap the dots) to switch between the limits page and the detail page.
 - **Tap the sessions block** to flip between today's active sessions and all-time top projects.
-- **Click the left icon** to switch between Claude and Codex.
+- **Click the left icon** to cycle between Claude, Codex and Antigravity.
 - **Right-click** the island for Provider, Icon (Clawd, mono, Spark), Pause, Animate icon, Hide in
   full screen, Launch at Login, Check for Updates, and Quit.
 
@@ -152,6 +159,7 @@ Command Line Tools.
   [pookify](https://github.com/eyadhammouda/pookify) (MIT).
 - "Claude" and the spark are trademarks of Anthropic, PBC, used nominatively.
 - "Codex" and the Codex logo are trademarks of OpenAI, used nominatively.
+- "Antigravity" and the Antigravity logo are trademarks of Google LLC, used nominatively.
 
 ## License
 

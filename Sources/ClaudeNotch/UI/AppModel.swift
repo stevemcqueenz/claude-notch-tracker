@@ -5,6 +5,7 @@ import SwiftUI
 final class AppModel {
     private(set) var snapshot: UsageSnapshot = .empty
     private(set) var codexSnapshot: ProviderUsageSnapshot = .unavailable(.codex)
+    private(set) var antigravitySnapshot: ProviderUsageSnapshot = .unavailable(.antigravity)
     private(set) var selectedProvider = UsageProviderID(
         rawValue: UserDefaults.standard.string(forKey: "selectedProvider") ?? ""
     ) ?? .claude
@@ -43,11 +44,12 @@ final class AppModel {
     private let loader = LogLoader()
     private let claudeAPI = ClaudeAPIService()
     private let codexProvider = CodexUsageProvider()
+    private let antigravityProvider = AntigravityUsageProvider()
     private let lifetimeScanner = LifetimeScanner()
     private var watcher: LogWatcher?
     private var ticker: Timer?
     private var limitsTimer: Timer?
-    private var codexTimer: Timer?
+    private var providerTimer: Timer?
     private var lifetimeTimer: Timer?
     /// mtime of each log file the last time we parsed it, so the periodic sweep re-reads only
     /// files that actually grew and skips the rest.
@@ -106,6 +108,7 @@ final class AppModel {
         switch selectedProvider {
         case .claude: max(claudeSessionUsage ?? 0, weeklyUsage ?? 0)
         case .codex: codexSnapshot.maximumUsage
+        case .antigravity: antigravitySnapshot.maximumUsage
         }
     }
 
@@ -151,6 +154,7 @@ final class AppModel {
         switch selectedProvider {
         case .claude: claudeProviderSnapshot
         case .codex: codexSnapshot
+        case .antigravity: antigravitySnapshot
         }
     }
 
@@ -242,8 +246,13 @@ final class AppModel {
         limitsTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.fetchLimits() }
         }
-        codexTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.fetchCodexUsage() }
+        // Each fetch is a no-op unless its provider is the selected one, so only the visible
+        // provider is ever polled.
+        providerTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.fetchCodexUsage()
+                self?.fetchAntigravityUsage()
+            }
         }
         Task.detached(priority: .utility) { [weak self] in
             let files = ClaudePaths.recentLogFiles(within: 2)   // recursive walk stays off-main
@@ -251,6 +260,7 @@ final class AppModel {
         }
         fetchLimits()
         fetchCodexUsage()
+        fetchAntigravityUsage()
         scanLifetime()
         lifetimeTimer = Timer.scheduledTimer(withTimeInterval: 600, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.scanLifetime() }
@@ -272,6 +282,7 @@ final class AppModel {
         switch selectedProvider {
         case .claude: fetchLimits(force: true)   // re-read the session, e.g. after a re-login
         case .codex: fetchCodexUsage()
+        case .antigravity: fetchAntigravityUsage()
         }
     }
 
@@ -281,6 +292,7 @@ final class AppModel {
             refresh()
             fetchLimits()
             fetchCodexUsage()
+            fetchAntigravityUsage()
         }
     }
     func selectProvider(_ provider: UsageProviderID) {
@@ -289,9 +301,10 @@ final class AppModel {
         switch provider {
         case .claude: fetchLimits()
         case .codex: fetchCodexUsage()
+        case .antigravity: fetchAntigravityUsage()
         }
     }
-    /// Advance to the next provider (icon click) — with two providers this is a toggle.
+    /// Advance to the next provider (icon click), wrapping at the end.
     func cycleProvider() {
         let providers = UsageProviderID.allCases
         guard let index = providers.firstIndex(of: selectedProvider) else { return }
@@ -322,6 +335,13 @@ final class AppModel {
         guard !isPaused, selectedProvider == .codex else { return }
         Task { [codexProvider] in
             self.codexSnapshot = await codexProvider.fetch()
+        }
+    }
+
+    func fetchAntigravityUsage() {
+        guard !isPaused, selectedProvider == .antigravity else { return }
+        Task { [antigravityProvider] in
+            self.antigravitySnapshot = await antigravityProvider.fetch()
         }
     }
 
