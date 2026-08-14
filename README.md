@@ -142,7 +142,7 @@ Command Line Tools.
 - **Tap the sessions block** to flip between today's active sessions and all-time top projects.
 - **Click the left icon** to switch between Claude and Codex.
 - **Right-click** the island for Provider, Icon (Clawd, mono, Spark), Pause, Animate icon, Hide in
-  full screen, Launch at Login, Check for Updates, and Quit.
+  full screen, Launch at Login, Check for Updates, GitHub Repository, and Quit.
 
 ## Credits
 

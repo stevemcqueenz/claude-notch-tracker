@@ -120,6 +120,7 @@ struct IslandView: View {
         Button((LoginItem.isEnabled ? "✓ " : "") + "Launch at Login") { LoginItem.toggle() }
         Divider()
         Button("Check for Updates…") { Updater.shared.checkForUpdates() }
+        Button("GitHub Repository…") { NSWorkspace.shared.open(AppInfo.repository) }
         Divider()
         Button("Claude Notch v\(AppInfo.version) — \(AppInfo.tagline)") {}.disabled(true)
         Divider()
