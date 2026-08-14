@@ -114,6 +114,56 @@ import Testing
         #expect(snapshot.primaryUsage == 0)
     }
 
+    /// A single group needs no prefix, an unrecognized window falls back to the bucket's own
+    /// name, and a bucket with no fraction is dropped rather than drawn as an empty ring.
+    @Test func labelsASingleGroupAndFallsBackOnUnknownWindows() throws {
+        let payload = """
+        {"status":"SUCCESS","command":{"name":"usage","data":{"groups":[
+          {"name":"Gemini Models","buckets":[
+            {"id":"a","name":"Monthly Limit Remaining","window":"monthly","remaining_fraction":0.5},
+            {"id":"b","name":"Burst Limit Remaining","window":"burst","remaining_fraction":0.25},
+            {"id":"c","name":"Weekly Limit Remaining","window":"weekly"}]}]}}}
+        """
+        let response = try AntigravityCLI.validate(Data(payload.utf8))
+        let snapshot = AntigravitySnapshotMapper.make(
+            quota: response, quotaError: nil, stats: .init(), activeModel: nil, now: Date()
+        )
+
+        // One group, so no "Gemini · " prefix; the unknown window keeps its own trimmed name and
+        // sorts last; the fractionless bucket is gone.
+        #expect(snapshot.limits.map(\.label) == ["Monthly", "Burst"])
+        #expect(snapshot.limits.map(\.id) == ["a", "b"])
+        #expect(snapshot.statusMessage == nil)
+    }
+
+    /// Lifetime tokens per project, biggest first — the "all-time · top projects" flip side of
+    /// the sessions list.
+    @Test func aggregatesTopProjectsAcrossConversations() {
+        let day = Date(timeIntervalSince1970: 1_770_000_000)
+        var stats = AntigravityLocalStats()
+        stats.totalTurns = 6
+        stats.totalTokens = 1_000
+        stats.conversations = [
+            .init(id: "1", tokens: 300, turns: 2, last: day, workspace: "notch"),
+            .init(id: "2", tokens: 500, turns: 2, last: day.addingTimeInterval(60),
+                  workspace: "notch"),
+            .init(id: "3", tokens: 200, turns: 1, last: day, workspace: "scratch"),
+            .init(id: "4", tokens: 900, turns: 1, last: day, workspace: nil),
+        ]
+
+        let snapshot = AntigravitySnapshotMapper.make(
+            quota: nil, quotaError: nil, stats: stats, activeModel: nil, now: day
+        )
+
+        // The two "notch" conversations fold into one project carrying the later timestamp;
+        // the conversation with no workspace is not a project at all.
+        #expect(snapshot.alternateSessions.map(\.name) == ["notch", "scratch"])
+        #expect(snapshot.alternateSessions.first?.tokens == 800)
+        #expect(snapshot.alternateSessions.first?.last == day.addingTimeInterval(60))
+        // Sessions stay per-conversation and are capped at three.
+        #expect(snapshot.sessions.count == 3)
+    }
+
     /// An older CLI answered `/usage` from the model instead of handling it, producing prose and
     /// no envelope. That must fail loudly rather than render invented quota.
     @Test func rejectsModelAnsweredUsage() {
