@@ -100,15 +100,19 @@ struct IslandView: View {
                 }
             }
         }
-        Menu("Icon") {
-            ForEach(AvatarStyle.allCases) { style in
-                Button {
-                    model.setAvatar(style)
-                } label: {
-                    if model.avatarStyle == style {
-                        Label(style.label, systemImage: "checkmark")
-                    } else {
-                        Text(style.label)
+        // Every style here is a Claude mark, and the other providers draw their own logo, so the
+        // picker would have no effect on what's on screen.
+        if model.selectedProvider == .claude {
+            Menu("Icon") {
+                ForEach(AvatarStyle.allCases) { style in
+                    Button {
+                        model.setAvatar(style)
+                    } label: {
+                        if model.avatarStyle == style {
+                            Label(style.label, systemImage: "checkmark")
+                        } else {
+                            Text(style.label)
+                        }
                     }
                 }
             }
@@ -120,6 +124,7 @@ struct IslandView: View {
         Button((LoginItem.isEnabled ? "✓ " : "") + "Launch at Login") { LoginItem.toggle() }
         Divider()
         Button("Check for Updates…") { Updater.shared.checkForUpdates() }
+        Button("GitHub Repository…") { NSWorkspace.shared.open(AppInfo.repository) }
         Divider()
         Button("Claude Notch v\(AppInfo.version) — \(AppInfo.tagline)") {}.disabled(true)
         Divider()
