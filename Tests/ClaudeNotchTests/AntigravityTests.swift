@@ -285,6 +285,45 @@ import Testing
         #expect(conversation.last == midday.addingTimeInterval(120))
     }
 
+    /// The scan caches each store by modification date and drops stores that disappear. Both
+    /// matter on a 60s poll: one keeps it from re-parsing an untouched history every minute, the
+    /// other keeps a deleted conversation from counting forever.
+    @Test func rereadsAStoreOnlyWhenItsTimestampMoves() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("antigravity-store-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let store = directory.appendingPathComponent("conversation.db")
+        let turn = FixtureStore.Turn(input: 100, output: 10, thinking: 4,
+                                     model: "gemini-3.7-flash",
+                                     at: Date(timeIntervalSince1970: 1_786_707_127))
+        let stamp = Date(timeIntervalSince1970: 1_786_700_000)
+        try FixtureStore.write(to: store, workspace: nil, turns: [turn])
+        try FileManager.default.setAttributes([.modificationDate: stamp],
+                                              ofItemAtPath: store.path)
+
+        let reader = FixtureStore.reader(for: directory)
+        #expect(reader.scan().totalTokens == 110)
+
+        // Twice the history, but pinned to the same timestamp: the cache is keyed on mtime, so
+        // this must come back unchanged rather than re-parsed.
+        try FileManager.default.removeItem(at: store)
+        try FixtureStore.write(to: store, workspace: nil, turns: [turn, turn])
+        try FileManager.default.setAttributes([.modificationDate: stamp],
+                                              ofItemAtPath: store.path)
+        #expect(reader.scan().totalTokens == 110)
+
+        // Same file, later timestamp → parsed again.
+        try FileManager.default.setAttributes([.modificationDate: stamp.addingTimeInterval(5)],
+                                              ofItemAtPath: store.path)
+        #expect(reader.scan().totalTokens == 220)
+
+        // A deleted store leaves the totals rather than lingering in the cache.
+        try FileManager.default.removeItem(at: store)
+        #expect(reader.scan().isEmpty)
+    }
+
     @Test func ignoresRowsThatDoNotDecode() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("antigravity-store-\(UUID().uuidString)")
@@ -388,10 +427,16 @@ private enum FixtureStore {
 
     /// Scans only the fixture stores in `directory` — never the machine's real history.
     static func scan(directory: URL) -> AntigravityLocalStats {
-        let stores = ((try? FileManager.default.contentsOfDirectory(
-            at: directory, includingPropertiesForKeys: nil)) ?? [])
-            .filter { $0.pathExtension == "db" }
-        return AntigravityLocalStore { stores }.scan()
+        reader(for: directory).scan()
+    }
+
+    /// A reader kept across scans, for the tests that care about its cache.
+    static func reader(for directory: URL) -> AntigravityLocalStore {
+        AntigravityLocalStore {
+            ((try? FileManager.default.contentsOfDirectory(
+                at: directory, includingPropertiesForKeys: nil)) ?? [])
+                .filter { $0.pathExtension == "db" }
+        }
     }
 
     private static func exec(_ handle: OpaquePointer, _ sql: String) {
