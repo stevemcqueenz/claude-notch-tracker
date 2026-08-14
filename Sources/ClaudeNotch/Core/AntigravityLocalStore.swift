@@ -106,17 +106,36 @@ final class AntigravityLocalStore: @unchecked Sendable {
     /// and checked against a full local history: `output == thinking + text` held for every one
     /// of 2,638 turns, which is what pins fields 3, 9 and 10 to their meanings. Anything that
     /// fails to decode is skipped, so a schema change costs accuracy, never a crash.
+    ///
+    /// The tree is nested here because a number means different things at different depths:
+    /// field 9 is the thinking count inside `usage`, and the timing submessage inside the record.
     private enum Field {
-        static let record = 1           // the turn record wrapping everything below
-        static let usage = 4            // token counts for this turn
-        static let inputTokens = 2      //   prompt tokens sent
-        static let outputTokens = 3     //   thinking + text
-        static let thinkingTokens = 9   //   reasoning portion of the output
-        static let timing = 9           // record.9 — wall-clock timing for the turn
-        static let startedAt = 4        //   timing.4 — a google.protobuf.Timestamp
-        static let seconds = 1          //     timestamp.1 — unix seconds
-        static let model = 19           // record.19 — e.g. "gemini-3.7-flash"
-        static let workspace = 7        // trajectory_metadata_blob.7 — "file:///path/to/project"
+        /// The turn record wrapping everything below.
+        static let record = 1
+
+        enum Record {
+            static let usage = 4        // token counts for this turn
+            static let timing = 9       // wall-clock timing for the turn
+            static let model = 19       // e.g. "gemini-3.7-flash"
+        }
+
+        enum Usage {
+            static let input = 2        // prompt tokens sent
+            static let output = 3       // thinking + text
+            static let thinking = 9     // reasoning portion of the output
+        }
+
+        enum Timing {
+            static let startedAt = 4    // a google.protobuf.Timestamp
+        }
+
+        enum Timestamp {
+            static let seconds = 1      // unix seconds
+        }
+
+        enum Trajectory {
+            static let workspace = 7    // "file:///path/to/project"
+        }
     }
 
     /// Guards against a misparse turning one corrupt row into billions of tokens.
@@ -141,11 +160,11 @@ final class AntigravityLocalStore: @unchecked Sendable {
             let blob = Data(bytes: pointer, count: count)
 
             guard let record = ProtobufMessage(blob).message(Field.record),
-                  let usage = record.message(Field.usage) else { return }
+                  let usage = record.message(Field.Record.usage) else { return }
 
-            let input = Int(usage.varint(Field.inputTokens) ?? 0)
-            let output = Int(usage.varint(Field.outputTokens) ?? 0)
-            let thinking = Int(usage.varint(Field.thinkingTokens) ?? 0)
+            let input = Int(usage.varint(Field.Usage.input) ?? 0)
+            let output = Int(usage.varint(Field.Usage.output) ?? 0)
+            let thinking = Int(usage.varint(Field.Usage.thinking) ?? 0)
             guard input >= 0, output >= 0,
                   input < maximumPlausibleTokens, output < maximumPlausibleTokens else { return }
 
@@ -154,13 +173,13 @@ final class AntigravityLocalStore: @unchecked Sendable {
             turns += 1
             stats.thinkingTokens += max(0, min(thinking, output))
 
-            if let model = record.string(Field.model), !model.isEmpty {
+            if let model = record.string(Field.Record.model), !model.isEmpty {
                 stats.turnsByModel[model, default: 0] += 1
             }
 
-            if let seconds = record.message(Field.timing)?
-                .message(Field.startedAt)?
-                .varint(Field.seconds), seconds > 0 {
+            if let seconds = record.message(Field.Record.timing)?
+                .message(Field.Timing.startedAt)?
+                .varint(Field.Timestamp.seconds), seconds > 0 {
                 let date = Date(timeIntervalSince1970: TimeInterval(seconds))
                 stats.tokensByDay[calendar.startOfDay(for: date), default: 0] += total
                 if date > last { last = date }
@@ -185,7 +204,7 @@ final class AntigravityLocalStore: @unchecked Sendable {
             guard let pointer = sqlite3_column_blob(statement, 0) else { return }
             let count = Int(sqlite3_column_bytes(statement, 0))
             guard count > 0 else { return }
-            uri = ProtobufMessage(Data(bytes: pointer, count: count)).string(Field.workspace)
+            uri = ProtobufMessage(Data(bytes: pointer, count: count)).string(Field.Trajectory.workspace)
         }
         guard let uri, !uri.isEmpty else { return nil }
         // Stored as a file:// URL; the display name only ever wants the folder.
