@@ -136,6 +136,23 @@ import Testing
         }
     }
 
+    /// A CLI that ignores its own `--print-timeout` must not hold the provider's queue forever.
+    @Test func killsACLIThatOutlivesItsTimeout() throws {
+        let started = Date()
+        #expect(throws: AntigravityProviderError.timedOut) {
+            try AntigravityCLI.capture(executable: URL(fileURLWithPath: "/bin/sleep"),
+                                       arguments: ["30"], timeout: 0.5)
+        }
+        // Back well before the sleep would have ended on its own.
+        #expect(Date().timeIntervalSince(started) < 10)
+    }
+
+    @Test func returnsOutputOfAProcessThatFinishesInTime() throws {
+        let data = try AntigravityCLI.capture(executable: URL(fileURLWithPath: "/bin/echo"),
+                                              arguments: ["{}"], timeout: 5)
+        #expect(String(decoding: data, as: UTF8.self) == "{}\n")
+    }
+
     @Test func keepsLocalStatsWhenQuotaIsUnavailable() {
         var stats = AntigravityLocalStats()
         stats.totalTokens = 20_553_387

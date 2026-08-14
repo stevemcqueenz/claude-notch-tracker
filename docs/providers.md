@@ -60,6 +60,10 @@ Two things the provider is strict about:
 - It keys off the payload's `status` field, never the exit code, which is `0` even on failure.
   The CLI's own error text embeds internal endpoint URLs and is never surfaced in the notch.
 
+Output is capped at 8 MiB, and a CLI that outlives its own `--print-timeout` is terminated by a
+45-second watchdog (SIGTERM, then SIGKILL). Every poll shares one queue, so a wedged `agy` would
+otherwise stall the provider indefinitely rather than for a single tick.
+
 **Consumption** is read from the local conversation stores under `~/.gemini/antigravity-cli/` and
 `~/.gemini/antigravity/`, which is what fills the 7-day chart, the stat tiles and the sessions
 list. Quota says what is left; only these say what was spent, on which model, and in which

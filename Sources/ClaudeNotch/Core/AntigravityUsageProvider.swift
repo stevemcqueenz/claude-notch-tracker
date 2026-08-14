@@ -42,18 +42,32 @@ private extension Result {
 
 enum AntigravityCLI {
     private static let maximumOutputBytes = 8 * 1_024 * 1_024
+    /// Backstop for a CLI that outlives its own `--print-timeout`. The provider funnels every
+    /// poll through one queue, so a single wedged `agy` would otherwise stall it for good.
+    static let timeout: TimeInterval = 45
 
     /// Runs `agy -p /usage --output-format json` and returns the decoded quota payload.
     static func usage() throws -> AntigravityUsageResponse {
         guard let executable = AntigravityPaths.executable() else {
             throw AntigravityProviderError.executableNotFound
         }
+        // Fixed arguments, launched directly — never via a shell.
+        let data = try capture(
+            executable: executable,
+            arguments: ["-p", "/usage", "--output-format", "json", "--print-timeout", "30s"],
+            timeout: timeout
+        )
+        return try validate(data)
+    }
 
+    /// Runs a process to completion and returns its stdout, killing it if it outlives `timeout`
+    /// or overruns the output cap. Always reaps, so a killed CLI leaves nothing behind.
+    static func capture(executable: URL, arguments: [String],
+                        timeout: TimeInterval) throws -> Data {
         let process = Process()
         let output = Pipe()
         process.executableURL = executable
-        // Fixed arguments, launched directly — never via a shell.
-        process.arguments = ["-p", "/usage", "--output-format", "json", "--print-timeout", "30s"]
+        process.arguments = arguments
         process.standardInput = FileHandle.nullDevice
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
@@ -64,18 +78,30 @@ enum AntigravityCLI {
             throw AntigravityProviderError.launchFailed
         }
 
+        let running = RunningProcess(process)
+        let watchdog = DispatchWorkItem { running.timeOut() }
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + timeout,
+                                                       execute: watchdog)
+        defer { watchdog.cancel() }
+
         var data = Data()
+        var overran = false
         while let chunk = try? output.fileHandleForReading.read(upToCount: 64 * 1_024),
               !chunk.isEmpty {
             data.append(chunk)
             if data.count > maximumOutputBytes {
-                process.terminate()
-                throw AntigravityProviderError.responseTooLarge
+                overran = true
+                running.stop()
+                break
             }
         }
+        // Killing the process closes the pipe, so the loop above ends either way and this only
+        // collects the exit status.
         process.waitUntilExit()
 
-        return try validate(data)
+        if overran { throw AntigravityProviderError.responseTooLarge }
+        if running.timedOut { throw AntigravityProviderError.timedOut }
+        return data
     }
 
     /// Decodes a `/usage` payload, rejecting anything that isn't a real quota answer.
@@ -106,10 +132,39 @@ enum AntigravityCLI {
     }
 }
 
+/// A launched process, terminable from the watchdog thread.
+///
+/// `Process` is not Sendable, but raising a signal at one is safe from any thread and that is all
+/// this does. The SIGTERM-then-SIGKILL escalation mirrors the Codex provider's cleanup.
+private final class RunningProcess: @unchecked Sendable {
+    private let process: Process
+    private let lock = NSLock()
+    private var expired = false
+
+    init(_ process: Process) { self.process = process }
+
+    /// True when the watchdog, rather than the output cap, ended the run.
+    var timedOut: Bool { lock.withLock { expired } }
+
+    func timeOut() {
+        lock.withLock { expired = true }
+        stop()
+    }
+
+    func stop() {
+        guard process.isRunning else { return }
+        process.terminate()
+        // Give SIGTERM ~1.5s to land before insisting.
+        for _ in 0..<15 where process.isRunning { usleep(100_000) }
+        if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+    }
+}
+
 enum AntigravityProviderError: LocalizedError {
     case executableNotFound
     case launchFailed
     case responseTooLarge
+    case timedOut
     case unreadableResponse
     case unsupportedCLI
     case requestFailed
@@ -119,6 +174,7 @@ enum AntigravityProviderError: LocalizedError {
         case .executableNotFound: "Antigravity CLI not found"
         case .launchFailed: "Antigravity CLI could not be launched"
         case .responseTooLarge: "Antigravity CLI response was too large"
+        case .timedOut: "Antigravity CLI timed out"
         case .unreadableResponse: "Antigravity usage response not recognized"
         case .unsupportedCLI: "Antigravity CLI is too old for /usage"
         // Deliberately generic: the CLI's own error text embeds internal endpoint URLs.
