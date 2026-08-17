@@ -466,24 +466,8 @@ private struct CodexAppServerTransport: Sendable {
     }
 
     private func findExecutable() throws -> URL {
-        let environment = ProcessInfo.processInfo.environment
-        var candidates: [String] = []
-        if let configured = environment["CODEX_NOTCH_BINARY"], !configured.isEmpty {
-            candidates.append(configured)
-        }
-        candidates += [
-            "/Applications/ChatGPT.app/Contents/Resources/codex",
-            "/Applications/Codex.app/Contents/Resources/codex",
-            "/opt/homebrew/bin/codex",
-            "/usr/local/bin/codex",
-        ]
-        if let path = environment["PATH"] {
-            candidates += path.split(separator: ":").map { "\($0)/codex" }
-        }
-        guard let path = candidates.first(where: FileManager.default.isExecutableFile(atPath:)) else {
-            throw CodexProviderError.executableNotFound
-        }
-        return URL(fileURLWithPath: path)
+        guard let url = CodexPaths.executable() else { throw CodexProviderError.executableNotFound }
+        return url
     }
 }
 

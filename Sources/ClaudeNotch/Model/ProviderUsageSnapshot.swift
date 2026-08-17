@@ -13,6 +13,14 @@ enum UsageProviderID: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// Shown when the user selects a provider this Mac has no install of.
+    var setupHint: String {
+        switch self {
+        case .claude: "Sign in to Claude to see usage here"
+        case .codex: "Install the Codex CLI to track usage here"
+        }
+    }
+
     var systemImage: String {
         switch self {
         case .claude: "sparkles"

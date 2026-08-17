@@ -92,10 +92,15 @@ struct IslandView: View {
                 Button {
                     model.selectProvider(provider)
                 } label: {
+                    // Undetected providers stay listed and selectable: hiding them would make the
+                    // feature invisible to anyone who installs the tool later.
+                    let name = ProviderAvailability.isAvailable(provider)
+                        ? provider.displayName
+                        : "\(provider.displayName) (not detected)"
                     if model.selectedProvider == provider {
-                        Label(provider.displayName, systemImage: "checkmark")
+                        Label(name, systemImage: "checkmark")
                     } else {
-                        Text(provider.displayName)
+                        Text(name)
                     }
                 }
             }
@@ -139,14 +144,18 @@ struct IslandView: View {
                 .frame(width: iconSize, height: iconSize)
                 .frame(width: wing, height: closedH)
                 .contentShape(Rectangle())
-                // Tap switches provider (Claude ⇄ Codex); the Claude icon style is picked from
-                // the right-click Icon menu.
+                // Tap cycles the providers this Mac has. With only one it cycles Clawd's look
+                // instead, which is what the click did before there was more than one provider.
                 .onTapGesture { model.cycleProvider() }
-                .help("Click to switch provider")
+                .help(model.iconClickSwitchesProvider
+                      ? "Click to switch provider"
+                      : "Click to change the icon")
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Switch provider")
+                .accessibilityLabel(model.iconClickSwitchesProvider ? "Switch provider" : "Change icon")
                 .accessibilityValue(model.selectedProvider.displayName)
-                .accessibilityHint("Switches between Claude and Codex")
+                .accessibilityHint(model.iconClickSwitchesProvider
+                                   ? "Cycles the providers installed on this Mac"
+                                   : "Cycles Clawd, mono and Spark")
                 .accessibilityAddTraits(.isButton)
                 .accessibilityInputLabels(["Switch provider", model.selectedProvider.displayName])
 
