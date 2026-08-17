@@ -141,8 +141,8 @@ Command Line Tools.
 - **Swipe** left or right (or tap the dots) to switch between the limits page and the detail page.
 - **Tap the sessions block** to flip between today's active sessions and all-time top projects.
 - **Click the left icon** to switch between Claude and Codex.
-- **Right-click** the island for Provider, Icon (Clawd, mono, Spark — Claude only), Pause, Animate
-  icon, Hide in full screen, Launch at Login, Check for Updates, and Quit.
+- **Right-click** the island for Provider, Icon (Clawd, mono, Spark, Claude only), Pause, Animate
+  icon, Hide in full screen, Launch at Login, Check for Updates, GitHub Repository, and Quit.
 
 ## Credits
 

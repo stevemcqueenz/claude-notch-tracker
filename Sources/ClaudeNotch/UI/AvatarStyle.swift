@@ -4,6 +4,7 @@ import ServiceManagement
 enum AppInfo {
     static let version = "0.3.2"
     static let tagline = "Claude & Codex"
+    static let repository = URL(string: "https://github.com/stevemcqueenz/claude-notch-tracker")!
 }
 
 /// Launch-at-login toggle (only effective when running as a bundled .app).
