@@ -266,6 +266,33 @@ struct IslandView: View {
     }
 
     // Page 1 — provider-defined account limits and summary metrics.
+    /// Nothing to render at all: a provider that isn't set up yet, or one whose first fetch
+    /// hasn't landed. Centred and calm, because this is a setup state rather than a failure.
+    /// The bottom warning line is for problems with data we *do* have (stale, spend capped).
+    private var providerPlaceholder: some View {
+        VStack(spacing: 5) {
+            Spacer(minLength: 0)
+            Text(provider.provider.displayName)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.8))
+            Text(provider.statusMessage ?? "Waiting for the first reading")
+                .font(.system(size: 11))
+                .foregroundStyle(.white.opacity(0.45))
+                .multilineTextAlignment(.center)
+                .lineLimit(2).minimumScaleFactor(0.85)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 14)
+    }
+
+    /// True when the page would otherwise be an empty grid with a lone warning line at the floor.
+    private var providerHasNothingToShow: Bool {
+        let s = provider
+        return s.limits.isEmpty && s.stats.isEmpty && s.dailySeries.isEmpty && s.sessions.isEmpty
+    }
+
     private var pageLimits: some View {
         let snapshot = provider
         // With a daily feed, the page is limits + the week chart as centerpiece; the plain
@@ -276,30 +303,34 @@ struct IslandView: View {
         let gridSlots = chartLayout ? 2 : 6
         let remainingSlots = max(0, gridSlots - snapshot.limits.count)
         return VStack(spacing: 8) {
-            LazyVGrid(columns: [.init(.flexible(), spacing: 8), .init(.flexible(), spacing: 8)], spacing: 8) {
-                ForEach(Array(snapshot.limits.prefix(gridSlots))) { metric in
-                    providerLimitTile(metric)
+            if providerHasNothingToShow {
+                providerPlaceholder
+            } else {
+                LazyVGrid(columns: [.init(.flexible(), spacing: 8), .init(.flexible(), spacing: 8)], spacing: 8) {
+                    ForEach(Array(snapshot.limits.prefix(gridSlots))) { metric in
+                        providerLimitTile(metric)
+                    }
+                    ForEach(Array(snapshot.stats.prefix(remainingSlots))) { metric in
+                        tile(metric.label, metric.value, height: .compact, sub: metric.subtitle)
+                    }
                 }
-                ForEach(Array(snapshot.stats.prefix(remainingSlots))) { metric in
-                    tile(metric.label, metric.value, height: .compact, sub: metric.subtitle)
+                .opacity(model.isStale ? 0.55 : 1)         // dim live limits when not fresh
+                if chartLayout {
+                    WeekActivityChart(series: snapshot.dailySeries, title: snapshot.chartTitle)
+                        .opacity(model.isStale ? 0.55 : 1)
                 }
-            }
-            .opacity(model.isStale ? 0.55 : 1)         // dim live limits when not fresh
-            if chartLayout {
-                WeekActivityChart(series: snapshot.dailySeries, title: snapshot.chartTitle)
-                    .opacity(model.isStale ? 0.55 : 1)
-            }
-            if let message = snapshot.statusMessage {
-                Spacer(minLength: 0)
-                Text(message).font(.system(size: 10))
-                    .foregroundStyle(Color(red: 0.96, green: 0.70, blue: 0.20))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .lineLimit(1).truncationMode(.tail)
-            } else if model.isStale {                   // only surface a problem, never chrome
-                Spacer(minLength: 0)
-                Text("reconnecting…").font(.system(size: 10))
-                    .foregroundStyle(Color(red: 0.96, green: 0.70, blue: 0.20))
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                if let message = snapshot.statusMessage {
+                    Spacer(minLength: 0)
+                    Text(message).font(.system(size: 10))
+                        .foregroundStyle(Color(red: 0.96, green: 0.70, blue: 0.20))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .lineLimit(1).truncationMode(.tail)
+                } else if model.isStale {                   // only surface a problem, never chrome
+                    Spacer(minLength: 0)
+                    Text("reconnecting…").font(.system(size: 10))
+                        .foregroundStyle(Color(red: 0.96, green: 0.70, blue: 0.20))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         }
     }
@@ -324,7 +355,9 @@ struct IslandView: View {
         let peakDetail = snapshot.stats.first(where: { $0.id == "peak-day" })
             .map { "peak \($0.value)" }
         return VStack(spacing: 8) {
-            if chartHere {
+            if providerHasNothingToShow {
+                providerPlaceholder
+            } else if chartHere {
                 WeekActivityChart(series: snapshot.dailySeries, title: snapshot.chartTitle)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
