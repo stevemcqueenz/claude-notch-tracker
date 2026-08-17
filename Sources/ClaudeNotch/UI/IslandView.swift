@@ -41,23 +41,35 @@ struct IslandView: View {
     private var closedWidth: CGFloat { wing + gap + wing + edgeInset * 2 }
     private var provider: ProviderUsageSnapshot { model.activeProviderSnapshot }
     private var used: Double { provider.primaryUsage ?? 0 }
-    /// Loaded once — this is read on every render of the closed row, and hitting the disk per
-    /// frame during animations would be pure waste. MainActor because NSImage isn't Sendable.
-    @MainActor private static let codexIcon: NSImage? = {
+    /// Loaded once each — these are read on every render of the closed row, and hitting the disk
+    /// per frame during animations would be pure waste. MainActor because NSImage isn't Sendable.
+    @MainActor private static let codexIcon: NSImage? = mark(named: "codex")
+    @MainActor private static let antigravityIcon: NSImage? = mark(named: "antigravity")
+
+    /// Resolves a bundled provider mark, preferring the packaged .app layout over SwiftPM's.
+    private static func mark(named name: String) -> NSImage? {
         if let resourcesURL = Bundle.main.resourceURL,
            let packagedBundle = Bundle(
                url: resourcesURL.appendingPathComponent("ClaudeNotch_ClaudeNotch.bundle")
            ),
-           let url = packagedBundle.url(forResource: "codex", withExtension: "png"),
+           let url = packagedBundle.url(forResource: name, withExtension: "png"),
            let image = NSImage(contentsOf: url) {
             return image
         }
 
-        guard let url = Bundle.module.url(forResource: "codex", withExtension: "png") else {
+        guard let url = Bundle.module.url(forResource: name, withExtension: "png") else {
             return nil
         }
         return NSImage(contentsOf: url)
-    }()
+    }
+
+    @MainActor private static func mark(for provider: UsageProviderID) -> NSImage? {
+        switch provider {
+        case .claude: nil               // Claude draws an animated avatar instead of a mark.
+        case .codex: codexIcon
+        case .antigravity: antigravityIcon
+        }
+    }
 
     var body: some View {
         let shape = NotchShape(topRadius: 8,
@@ -186,8 +198,8 @@ struct IslandView: View {
             AvatarView(style: model.avatarStyle,
                        active: model.animateIcon && !model.isPaused && !model.isAtLimit,
                        urgency: model.iconUrgency)
-        } else if let icon = Self.codexIcon {
-            CodexIconView(
+        } else if let icon = Self.mark(for: model.selectedProvider) {
+            ProviderMarkView(
                 image: icon,
                 active: model.animateIcon && !model.isPaused && !model.isAtLimit,
                 urgency: model.iconUrgency

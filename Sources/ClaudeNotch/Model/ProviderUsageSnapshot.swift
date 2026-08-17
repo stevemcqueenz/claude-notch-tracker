@@ -3,6 +3,7 @@ import Foundation
 enum UsageProviderID: String, CaseIterable, Identifiable, Sendable {
     case claude
     case codex
+    case antigravity
 
     var id: String { rawValue }
 
@@ -10,6 +11,7 @@ enum UsageProviderID: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .claude: "Claude"
         case .codex: "Codex"
+        case .antigravity: "Antigravity"
         }
     }
 
@@ -18,6 +20,7 @@ enum UsageProviderID: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .claude: "Sign in to Claude to see usage here"
         case .codex: "Install the Codex CLI to track usage here"
+        case .antigravity: "Install the Antigravity CLI to track usage here"
         }
     }
 
@@ -25,6 +28,7 @@ enum UsageProviderID: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .claude: "sparkles"
         case .codex: "terminal.fill"
+        case .antigravity: "mountain.2.fill"
         }
     }
 }

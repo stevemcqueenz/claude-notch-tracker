@@ -5,6 +5,7 @@ import SwiftUI
 final class AppModel {
     private(set) var snapshot: UsageSnapshot = .empty
     private(set) var codexSnapshot: ProviderUsageSnapshot = .unavailable(.codex)
+    private(set) var antigravitySnapshot: ProviderUsageSnapshot = .unavailable(.antigravity)
     /// The stored choice, or Claude. Note this is the *saved* preference: `start()` may show a
     /// different provider when the saved one isn't installed, without overwriting this, so the
     /// choice comes back if the tool is reinstalled.
@@ -46,11 +47,12 @@ final class AppModel {
     private let loader = LogLoader()
     private let claudeAPI = ClaudeAPIService()
     private let codexProvider = CodexUsageProvider()
+    private let antigravityProvider = AntigravityUsageProvider()
     private let lifetimeScanner = LifetimeScanner()
     private var watcher: LogWatcher?
     private var ticker: Timer?
     private var limitsTimer: Timer?
-    private var codexTimer: Timer?
+    private var providerTimer: Timer?
     private var lifetimeTimer: Timer?
     /// mtime of each log file the last time we parsed it, so the periodic sweep re-reads only
     /// files that actually grew and skips the rest.
@@ -109,6 +111,7 @@ final class AppModel {
         switch selectedProvider {
         case .claude: max(claudeSessionUsage ?? 0, weeklyUsage ?? 0)
         case .codex: codexSnapshot.maximumUsage
+        case .antigravity: antigravitySnapshot.maximumUsage
         }
     }
 
@@ -155,6 +158,7 @@ final class AppModel {
         switch selectedProvider {
         case .claude: snapshot = claudeProviderSnapshot
         case .codex: snapshot = codexSnapshot
+        case .antigravity: snapshot = antigravitySnapshot
         }
         // Picking a provider that isn't installed is a setup state, not a failure: say what to do
         // instead of showing the raw "executable not found" in warning amber.
@@ -258,8 +262,13 @@ final class AppModel {
         limitsTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.fetchLimits() }
         }
-        codexTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.fetchCodexUsage() }
+        // Each fetch is a no-op unless its provider is the selected one, so only the visible
+        // provider is ever polled.
+        providerTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.fetchCodexUsage()
+                self?.fetchAntigravityUsage()
+            }
         }
         Task.detached(priority: .utility) { [weak self] in
             let files = ClaudePaths.recentLogFiles(within: 2)   // recursive walk stays off-main
@@ -267,6 +276,7 @@ final class AppModel {
         }
         fetchLimits()
         fetchCodexUsage()
+        fetchAntigravityUsage()
         scanLifetime()
         lifetimeTimer = Timer.scheduledTimer(withTimeInterval: 600, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.scanLifetime() }
@@ -288,6 +298,7 @@ final class AppModel {
         switch selectedProvider {
         case .claude: fetchLimits(force: true)   // re-read the session, e.g. after a re-login
         case .codex: fetchCodexUsage()
+        case .antigravity: fetchAntigravityUsage(force: true)
         }
     }
 
@@ -297,6 +308,7 @@ final class AppModel {
             refresh()
             fetchLimits()
             fetchCodexUsage()
+            fetchAntigravityUsage()
         }
     }
     func selectProvider(_ provider: UsageProviderID) {
@@ -305,6 +317,7 @@ final class AppModel {
         switch provider {
         case .claude: fetchLimits()
         case .codex: fetchCodexUsage()
+        case .antigravity: fetchAntigravityUsage()
         }
     }
     /// Icon click. Cycles the providers this Mac actually has, so the click can't land on a tool
@@ -350,6 +363,13 @@ final class AppModel {
         guard !isPaused, selectedProvider == .codex else { return }
         Task { [codexProvider] in
             self.codexSnapshot = await codexProvider.fetch()
+        }
+    }
+
+    func fetchAntigravityUsage(force: Bool = false) {
+        guard !isPaused, selectedProvider == .antigravity else { return }
+        Task { [antigravityProvider] in
+            self.antigravitySnapshot = await antigravityProvider.fetch(force: force)
         }
     }
 

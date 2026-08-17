@@ -14,6 +14,7 @@ let package = Package(
             resources: [
                 .copy("Resources/codex.svg"),
                 .copy("Resources/codex.png"),
+                .copy("Resources/antigravity.png"),
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),

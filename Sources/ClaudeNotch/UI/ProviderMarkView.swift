@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// Gives the supplied Codex mark a calm floating motion while tracking is active.
-struct CodexIconView: View {
+/// Gives a provider's supplied mark a calm floating motion while tracking is active.
+struct ProviderMarkView: View {
     let image: NSImage
     var active: Bool
     var urgency: Double

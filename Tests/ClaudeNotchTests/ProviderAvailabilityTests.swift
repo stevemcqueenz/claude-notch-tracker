@@ -38,6 +38,21 @@ import Testing
         }
     }
 
+    @Test func antigravityNeedsEitherTheCLIOrLocalHistory() {
+        // Either half is useful on its own: the CLI gives quota rings, local stores give the
+        // chart and tiles. Detection must agree with the paths the provider actually reads.
+        let expected = AntigravityPaths.executable() != nil
+            || !AntigravityPaths.dataDirectories.isEmpty
+        #expect(ProviderAvailability.isAvailable(.antigravity) == expected)
+    }
+
+    @Test func undetectedProvidersStayOutOfTheCycle() {
+        let available = ProviderAvailability.available()
+        for provider in UsageProviderID.allCases where !ProviderAvailability.isAvailable(provider) {
+            #expect(!available.contains(provider))
+        }
+    }
+
     @Test func codexDetectionMatchesTheTransportsOwnLookup() {
         // Detection and the app-server transport must agree on what "installed" means, or the
         // cycle would offer a provider that then fails to launch.

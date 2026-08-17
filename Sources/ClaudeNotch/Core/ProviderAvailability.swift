@@ -40,6 +40,10 @@ enum ProviderAvailability {
         // terminal feed, then a log estimate), so it is always offered.
         case .claude: true
         case .codex: CodexPaths.executable() != nil
+        // Either half is enough: the CLI alone gives quota rings, and local stores alone still
+        // fill the chart and tiles when `agy` is missing.
+        case .antigravity:
+            AntigravityPaths.executable() != nil || !AntigravityPaths.dataDirectories.isEmpty
         }
     }
 }
