@@ -100,15 +100,19 @@ struct IslandView: View {
                 }
             }
         }
-        Menu("Icon") {
-            ForEach(AvatarStyle.allCases) { style in
-                Button {
-                    model.setAvatar(style)
-                } label: {
-                    if model.avatarStyle == style {
-                        Label(style.label, systemImage: "checkmark")
-                    } else {
-                        Text(style.label)
+        // Every style here is a Claude mark, and Codex draws its own logo, so the picker would
+        // have no effect on what's on screen.
+        if model.selectedProvider == .claude {
+            Menu("Icon") {
+                ForEach(AvatarStyle.allCases) { style in
+                    Button {
+                        model.setAvatar(style)
+                    } label: {
+                        if model.avatarStyle == style {
+                            Label(style.label, systemImage: "checkmark")
+                        } else {
+                            Text(style.label)
+                        }
                     }
                 }
             }
