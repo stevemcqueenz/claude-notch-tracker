@@ -3,6 +3,25 @@
     <channel>
         <title>Claude Notch</title>
         <item>
+            <title>0.3.3</title>
+            <description><![CDATA[
+                <h2>A third provider, and a tidier menu</h2>
+                <ul>
+                    <li><b>Antigravity</b> joins Claude and Codex: rate-limit windows, token totals, models, projects and a 7-day chart, read from the CLI's own read-only usage command and its local conversation stores. Contributed by <a href="https://github.com/hexxt-git">@hexxt-git</a>.</li>
+                    <li><b>Only the providers you have</b>: clicking the island's icon now cycles the tools actually installed on your Mac, so it can't land on one you don't use. With Claude alone, the click goes back to changing Clawd's look.</li>
+                    <li>Picking a provider you haven't set up explains how to set it up, instead of showing an error</li>
+                    <li><b>GitHub Repository</b> in the right-click menu, and the Icon submenu now appears only for Claude, whose marks it actually changes</li>
+                </ul>
+                <p>Thanks to <b>hexxt-git</b> for three of these.</p>
+            ]]></description>
+            <pubDate>Tue, 18 Aug 2026 01:39:16 +0200</pubDate>
+            <sparkle:version>0.3.3</sparkle:version>
+            <sparkle:shortVersionString>0.3.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/stevemcqueenz/claude-notch-tracker/releases/download/v0.3.3/ClaudeNotch.zip" length="1783368" type="application/octet-stream" sparkle:edSignature="8eYY+PMQQ6LSwEBOVOaVmDAmeb8Dh55QQBAzh84DP5sNwOr1qC18LSWlrqF7fF7mORsw+3fPhj1IGRXo2rUyAw=="/>
+        </item>
+        <item>
             <title>0.3.2</title>
             <description><![CDATA[
                 <h2>Far fewer Keychain prompts</h2>
