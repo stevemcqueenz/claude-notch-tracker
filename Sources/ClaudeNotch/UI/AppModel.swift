@@ -5,6 +5,9 @@ import SwiftUI
 final class AppModel {
     private(set) var snapshot: UsageSnapshot = .empty
     private(set) var codexSnapshot: ProviderUsageSnapshot = .unavailable(.codex)
+    /// The stored choice, or Claude. Note this is the *saved* preference: `start()` may show a
+    /// different provider when the saved one isn't installed, without overwriting this, so the
+    /// choice comes back if the tool is reinstalled.
     private(set) var selectedProvider = UsageProviderID(
         rawValue: UserDefaults.standard.string(forKey: "selectedProvider") ?? ""
     ) ?? .claude
@@ -148,10 +151,17 @@ final class AppModel {
     }
 
     var activeProviderSnapshot: ProviderUsageSnapshot {
+        var snapshot: ProviderUsageSnapshot
         switch selectedProvider {
-        case .claude: claudeProviderSnapshot
-        case .codex: codexSnapshot
+        case .claude: snapshot = claudeProviderSnapshot
+        case .codex: snapshot = codexSnapshot
         }
+        // Picking a provider that isn't installed is a setup state, not a failure: say what to do
+        // instead of showing the raw "executable not found" in warning amber.
+        if !ProviderAvailability.isAvailable(selectedProvider), snapshot.limits.isEmpty {
+            snapshot.statusMessage = selectedProvider.setupHint
+        }
+        return snapshot
     }
 
     private var claudeProviderSnapshot: ProviderUsageSnapshot {
@@ -230,6 +240,12 @@ final class AppModel {
     private var configURL: URL { home.appendingPathComponent(".claude.json") }
 
     func start() {
+        // Never open on a provider this Mac can't show anything for; the preference is left
+        // alone so reinstalling the tool restores the user's choice.
+        if !ProviderAvailability.isAvailable(selectedProvider),
+           let fallback = ProviderAvailability.available().first {
+            selectedProvider = fallback
+        }
         readPlanLimits()
         watcher = LogWatcher { [weak self] urls in
             guard let self, !self.isPaused else { return }
@@ -291,12 +307,24 @@ final class AppModel {
         case .codex: fetchCodexUsage()
         }
     }
-    /// Advance to the next provider (icon click) — with two providers this is a toggle.
+    /// Icon click. Cycles the providers this Mac actually has, so the click can't land on a tool
+    /// that isn't installed. With only one such provider there is nothing to switch between, so
+    /// the click returns to its original meaning and cycles Clawd's look instead.
     func cycleProvider() {
-        let providers = UsageProviderID.allCases
-        guard let index = providers.firstIndex(of: selectedProvider) else { return }
+        let providers = ProviderAvailability.available()
+        guard providers.count > 1 else {
+            if selectedProvider == .claude { cycleAvatar() }
+            return
+        }
+        guard let index = providers.firstIndex(of: selectedProvider) else {
+            selectProvider(providers[0])
+            return
+        }
         selectProvider(providers[(index + 1) % providers.count])
     }
+
+    /// What the icon click will do, for the tooltip and the accessibility hint.
+    var iconClickSwitchesProvider: Bool { ProviderAvailability.available().count > 1 }
     func cycleAvatar() { setAvatar(avatarStyle.next) }
     func setAvatar(_ s: AvatarStyle) { avatarStyle = s; AvatarStyle.selected = s }
     func toggleAnimateIcon() {
