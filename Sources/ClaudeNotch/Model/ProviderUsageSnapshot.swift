@@ -4,6 +4,7 @@ enum UsageProviderID: String, CaseIterable, Identifiable, Sendable {
     case claude
     case codex
     case antigravity
+    case opencodeGo
 
     var id: String { rawValue }
 
@@ -12,6 +13,7 @@ enum UsageProviderID: String, CaseIterable, Identifiable, Sendable {
         case .claude: "Claude"
         case .codex: "Codex"
         case .antigravity: "Antigravity"
+        case .opencodeGo: "opencode-go"
         }
     }
 
@@ -21,6 +23,7 @@ enum UsageProviderID: String, CaseIterable, Identifiable, Sendable {
         case .claude: "Sign in to Claude to see usage here"
         case .codex: "Install the Codex CLI to track usage here"
         case .antigravity: "Install the Antigravity CLI to track usage here"
+        case .opencodeGo: "Sign in to opencode-go to see usage here"
         }
     }
 
@@ -29,6 +32,7 @@ enum UsageProviderID: String, CaseIterable, Identifiable, Sendable {
         case .claude: "sparkles"
         case .codex: "terminal.fill"
         case .antigravity: "mountain.2.fill"
+        case .opencodeGo: "chevron.left.forwardslash.chevron.right"
         }
     }
 }

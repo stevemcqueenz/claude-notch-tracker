@@ -44,6 +44,9 @@ enum ProviderAvailability {
         // fill the chart and tiles when `agy` is missing.
         case .antigravity:
             AntigravityPaths.executable() != nil || !AntigravityPaths.dataDirectories.isEmpty
+        // Either half is enough: a signed-in gateway or local history still fills the panel.
+        case .opencodeGo:
+            OpencodeGoPaths.hasAuth || OpencodeGoPaths.databaseExists
         }
     }
 }

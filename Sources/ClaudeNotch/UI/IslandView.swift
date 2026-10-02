@@ -68,6 +68,7 @@ struct IslandView: View {
         case .claude: nil               // Claude draws an animated avatar instead of a mark.
         case .codex: codexIcon
         case .antigravity: antigravityIcon
+        case .opencodeGo: nil           // Falls back to its SF Symbol in the picker/overview.
         }
     }
 
@@ -92,6 +93,13 @@ struct IslandView: View {
         .onChange(of: model.selectedProvider) { _, _ in
             showAllTime = false
             page = 0
+        }
+        .onChange(of: page) { _, newPage in
+            // Only the overview page needs every provider; nothing polls while it's closed.
+            if newPage == 2 { model.refreshAllProviders() }
+        }
+        .onChange(of: model.isExpanded) { _, isExpanded in
+            if isExpanded, page == 2 { model.refreshAllProviders() }
         }
         .animation(.spring(response: 0.6, dampingFraction: 1.0), value: expanded)
         .animation(.easeInOut(duration: 0.3), value: used)
@@ -220,7 +228,7 @@ struct IslandView: View {
         }
     }
 
-    // MARK: drop-down — two swipeable pages below the notch
+    // MARK: drop-down — three swipeable pages below the notch
 
     private var contentWidth: CGFloat { closedWidth - edgeInset * 2 }
     private var pagerHeight: CGFloat { dropHeight - 29 }   // leaves room for the dots + padding
@@ -231,6 +239,7 @@ struct IslandView: View {
                 HStack(spacing: 0) {
                     pageLimits.frame(width: contentWidth, height: pagerHeight, alignment: .top)
                     pageLocal.frame(width: contentWidth, height: pagerHeight, alignment: .top)
+                    pageOverview.frame(width: contentWidth, height: pagerHeight, alignment: .top)
                 }
                 .offset(x: -CGFloat(page) * contentWidth + dragX)
                 .animation(.spring(response: 0.4, dampingFraction: 0.85), value: page)
@@ -242,7 +251,7 @@ struct IslandView: View {
                 DragGesture(minimumDistance: 12)
                     .onChanged { dragX = $0.translation.width }
                     .onEnded { v in
-                        if v.translation.width < -40 { page = min(1, page + 1) }
+                        if v.translation.width < -40 { page = min(2, page + 1) }
                         else if v.translation.width > 40 { page = max(0, page - 1) }
                         dragX = 0
                     }
@@ -253,12 +262,13 @@ struct IslandView: View {
     }
 
     private var pageDots: some View {
-        HStack(spacing: 5) {
-            ForEach(0..<2, id: \.self) { i in
+        let labels = ["Limits page", "Detail page", "Overview page"]
+        return HStack(spacing: 5) {
+            ForEach(0..<3, id: \.self) { i in
                 Circle().fill(.white.opacity(i == page ? 0.85 : 0.25))
                     .frame(width: 5, height: 5)
                     .onTapGesture { page = i }
-                    .accessibilityLabel(i == 0 ? "Limits page" : "Detail page")
+                    .accessibilityLabel(labels[i])
                     .accessibilityAddTraits(i == page ? [.isButton, .isSelected] : .isButton)
             }
         }
@@ -373,6 +383,97 @@ struct IslandView: View {
             }
             sessionsBlock
             Spacer(minLength: 0)
+        }
+    }
+
+    // Page 3 — every provider's remaining quota at a glance. Same tile treatment as page 1:
+    // one compact card per provider, up to three remaining-quota chips, "+N" for the rest.
+    private var pageOverview: some View {
+        VStack(spacing: 5) {
+            ForEach(model.allProviderSnapshots, id: \.provider) { snapshot in
+                overviewRow(snapshot)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func overviewRow(_ snapshot: ProviderUsageSnapshot) -> some View {
+        let available = ProviderAvailability.isAvailable(snapshot.provider)
+        let limits = Array(snapshot.limits.prefix(3))
+        let overflow = snapshot.limits.count - limits.count
+        return HStack(alignment: .center, spacing: 8) {
+            overviewMark(snapshot.provider)
+                .frame(width: 18, height: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 5) {
+                    Text(snapshot.provider.displayName)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white.opacity(available ? 0.9 : 0.45))
+                        .lineLimit(1)
+                    if let plan = snapshot.planName {
+                        Text(plan).font(.system(size: 9))
+                            .foregroundStyle(.white.opacity(0.4))
+                            .lineLimit(1)
+                    }
+                }
+                if limits.isEmpty {
+                    Text(snapshot.statusMessage ?? "—")
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .lineLimit(1).truncationMode(.tail)
+                } else {
+                    HStack(spacing: 6) {
+                        ForEach(limits) { metric in overviewChip(metric) }
+                        if overflow > 0 {
+                            Text("+\(overflow)")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.45))
+                        }
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10).padding(.vertical, 5)
+        .background(Color.white.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .opacity(available ? 1 : 0.6)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(snapshot.provider.displayName) remaining usage")
+    }
+
+    /// A limit as *remaining* (1 - used) with a slim bar matching the tile colour thresholds.
+    private func overviewChip(_ metric: UsageLimitMetric) -> some View {
+        let used = metric.usedFraction ?? 0
+        let remaining = 1 - used
+        return VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 3) {
+                Text(metric.label)
+                    .font(.system(size: 8.5))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .lineLimit(1)
+                Text(Fmt.pct(remaining))
+                    .font(.system(size: 9.5, weight: .semibold)).monospacedDigit()
+                    .foregroundStyle(barColor(used))
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(.white.opacity(0.14))
+                    Capsule().fill(barColor(used)).frame(width: geo.size.width * remaining)
+                }
+            }
+            .frame(height: 3)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder private func overviewMark(_ provider: UsageProviderID) -> some View {
+        if let icon = Self.mark(for: provider) {
+            Image(nsImage: icon).resizable().scaledToFit()
+        } else {
+            Image(systemName: provider.systemImage)
+                .resizable().scaledToFit()
+                .foregroundStyle(.white.opacity(0.8))
         }
     }
 

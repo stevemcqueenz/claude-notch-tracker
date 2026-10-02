@@ -6,6 +6,7 @@ final class AppModel {
     private(set) var snapshot: UsageSnapshot = .empty
     private(set) var codexSnapshot: ProviderUsageSnapshot = .unavailable(.codex)
     private(set) var antigravitySnapshot: ProviderUsageSnapshot = .unavailable(.antigravity)
+    private(set) var opencodeGoSnapshot: ProviderUsageSnapshot = .unavailable(.opencodeGo)
     /// The stored choice, or Claude. Note this is the *saved* preference: `start()` may show a
     /// different provider when the saved one isn't installed, without overwriting this, so the
     /// choice comes back if the tool is reinstalled.
@@ -48,12 +49,16 @@ final class AppModel {
     private let claudeAPI = ClaudeAPIService()
     private let codexProvider = CodexUsageProvider()
     private let antigravityProvider = AntigravityUsageProvider()
+    private let opencodeGoProvider = OpencodeGoUsageProvider()
     private let lifetimeScanner = LifetimeScanner()
     private var watcher: LogWatcher?
     private var ticker: Timer?
     private var limitsTimer: Timer?
     private var providerTimer: Timer?
     private var lifetimeTimer: Timer?
+    /// Last time the overview page pulled every provider, so a swipe back and forth can't hammer
+    /// the network/disk. Replaces a timer: nothing polls while the overview is closed.
+    private var lastOverviewRefresh = Date.distantPast
     /// mtime of each log file the last time we parsed it, so the periodic sweep re-reads only
     /// files that actually grew and skips the rest.
     private var parsedMTimes: [URL: Date] = [:]
@@ -112,6 +117,7 @@ final class AppModel {
         case .claude: max(claudeSessionUsage ?? 0, weeklyUsage ?? 0)
         case .codex: codexSnapshot.maximumUsage
         case .antigravity: antigravitySnapshot.maximumUsage
+        case .opencodeGo: opencodeGoSnapshot.maximumUsage
         }
     }
 
@@ -154,16 +160,26 @@ final class AppModel {
     }
 
     var activeProviderSnapshot: ProviderUsageSnapshot {
+        snapshot(for: selectedProvider)
+    }
+
+    /// Every provider's snapshot in menu order — what the overview page renders.
+    var allProviderSnapshots: [ProviderUsageSnapshot] {
+        UsageProviderID.allCases.map(snapshot(for:))
+    }
+
+    func snapshot(for provider: UsageProviderID) -> ProviderUsageSnapshot {
         var snapshot: ProviderUsageSnapshot
-        switch selectedProvider {
+        switch provider {
         case .claude: snapshot = claudeProviderSnapshot
         case .codex: snapshot = codexSnapshot
         case .antigravity: snapshot = antigravitySnapshot
+        case .opencodeGo: snapshot = opencodeGoSnapshot
         }
         // Picking a provider that isn't installed is a setup state, not a failure: say what to do
         // instead of showing the raw "executable not found" in warning amber.
-        if !ProviderAvailability.isAvailable(selectedProvider), snapshot.limits.isEmpty {
-            snapshot.statusMessage = selectedProvider.setupHint
+        if !ProviderAvailability.isAvailable(provider), snapshot.limits.isEmpty {
+            snapshot.statusMessage = provider.setupHint
         }
         return snapshot
     }
@@ -277,6 +293,7 @@ final class AppModel {
         fetchLimits()
         fetchCodexUsage()
         fetchAntigravityUsage()
+        fetchOpencodeGoUsage()
         scanLifetime()
         lifetimeTimer = Timer.scheduledTimer(withTimeInterval: 600, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.scanLifetime() }
@@ -299,6 +316,22 @@ final class AppModel {
         case .claude: fetchLimits(force: true)   // re-read the session, e.g. after a re-login
         case .codex: fetchCodexUsage()
         case .antigravity: fetchAntigravityUsage(force: true)
+        case .opencodeGo: fetchOpencodeGoUsage()
+        }
+    }
+
+    /// Pull every provider this Mac has, for the overview page. Debounced because the pager can
+    /// bounce back and forth; no timer, so nothing polls while the overview stays closed.
+    func refreshAllProviders() {
+        guard !isPaused, Date().timeIntervalSince(lastOverviewRefresh) >= 20 else { return }
+        lastOverviewRefresh = Date()
+        for provider in ProviderAvailability.available() {
+            switch provider {
+            case .claude: fetchLimits(anyProvider: true)
+            case .codex: fetchCodexUsage(anyProvider: true)
+            case .antigravity: fetchAntigravityUsage(anyProvider: true)
+            case .opencodeGo: fetchOpencodeGoUsage(anyProvider: true)
+            }
         }
     }
 
@@ -309,6 +342,7 @@ final class AppModel {
             fetchLimits()
             fetchCodexUsage()
             fetchAntigravityUsage()
+            fetchOpencodeGoUsage()
         }
     }
     func selectProvider(_ provider: UsageProviderID) {
@@ -318,6 +352,7 @@ final class AppModel {
         case .claude: fetchLimits()
         case .codex: fetchCodexUsage()
         case .antigravity: fetchAntigravityUsage()
+        case .opencodeGo: fetchOpencodeGoUsage(anyProvider: true)
         }
     }
     /// Icon click. Cycles the providers this Mac actually has, so the click can't land on a tool
@@ -352,24 +387,31 @@ final class AppModel {
     /// Fetch live claude.ai limits off-main (Keychain prompt appears on first run).
     /// Only replaces the last-known-good limits with a response that actually carries a
     /// session %, so a partial/failed read can never clobber correct data.
-    func fetchLimits(force: Bool = false) {
-        guard !isPaused, selectedProvider == .claude else { return }
+    func fetchLimits(force: Bool = false, anyProvider: Bool = false) {
+        guard !isPaused, anyProvider || selectedProvider == .claude else { return }
         Task { [claudeAPI] in
             if let l = await claudeAPI.fetch(force: force), l.sessionPct != nil { self.applyLimits(l) }
         }
     }
 
-    func fetchCodexUsage() {
-        guard !isPaused, selectedProvider == .codex else { return }
+    func fetchCodexUsage(anyProvider: Bool = false) {
+        guard !isPaused, anyProvider || selectedProvider == .codex else { return }
         Task { [codexProvider] in
             self.codexSnapshot = await codexProvider.fetch()
         }
     }
 
-    func fetchAntigravityUsage(force: Bool = false) {
-        guard !isPaused, selectedProvider == .antigravity else { return }
+    func fetchAntigravityUsage(force: Bool = false, anyProvider: Bool = false) {
+        guard !isPaused, anyProvider || selectedProvider == .antigravity else { return }
         Task { [antigravityProvider] in
             self.antigravitySnapshot = await antigravityProvider.fetch(force: force)
+        }
+    }
+
+    func fetchOpencodeGoUsage(anyProvider: Bool = false) {
+        guard !isPaused, anyProvider || selectedProvider == .opencodeGo else { return }
+        Task { [opencodeGoProvider] in
+            self.opencodeGoSnapshot = await opencodeGoProvider.fetch()
         }
     }
 
