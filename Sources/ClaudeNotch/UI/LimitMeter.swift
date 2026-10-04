@@ -29,7 +29,7 @@ struct LimitMeterRow: View {
                     .foregroundStyle(Self.color(used ?? 0))
             }
             bar(used: used, elapsed: elapsed)
-                .padding(.top, 5).padding(.bottom, 4)
+                .padding(.top, 4).padding(.bottom, 3)
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(metric.resetsAt.map { "resets in \(Fmt.until($0))" } ?? "resets —")
                     .foregroundStyle(.white.opacity(0.4))

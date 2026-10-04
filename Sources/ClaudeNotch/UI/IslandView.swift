@@ -368,7 +368,7 @@ struct IslandView: View {
                     }
                     .opacity(model.isStale ? 0.55 : 1)      // dim live numbers when not fresh
                 } else {
-                    VStack(spacing: 10) {
+                    VStack(spacing: 8) {
                         ForEach(meterLimits) { metric in
                             // Claude only: the 5-hour trend says the limit lands before the reset.
                             LimitMeterRow(metric: metric,
@@ -376,7 +376,7 @@ struct IslandView: View {
                                               ? model.etaToLimit.map { "~\(Fmt.dur($0)) to limit" } : nil)
                         }
                     }
-                    .padding(.horizontal, 14).padding(.vertical, 11)
+                    .padding(.horizontal, 14).padding(.vertical, 10)
                     .background(Color.white.opacity(0.06))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .opacity(model.isStale ? 0.55 : 1)
