@@ -270,7 +270,7 @@ struct IslandView: View {
     // MARK: drop-down — two swipeable pages below the notch
 
     private var contentWidth: CGFloat { closedWidth - dropInset * 2 }
-    private var pagerHeight: CGFloat { dropHeight - 29 }   // leaves room for the dots + padding
+    private var pagerHeight: CGFloat { dropHeight - 27 }   // leaves room for the dots + padding (4 + 6 + 8 + 9)
 
     private var dropDown: some View {
         VStack(spacing: 6) {
@@ -293,7 +293,7 @@ struct IslandView: View {
             .background(TrackpadSwipeReader(onChange: { dragX = $0 }, onEnd: endSwipe))
             pageDots
         }
-        .padding(.horizontal, dropInset).padding(.top, 6).padding(.bottom, 9)
+        .padding(.horizontal, dropInset).padding(.top, 4).padding(.bottom, 9)
     }
 
     /// Settles a click-drag or trackpad swipe: past 40pt flips the page, otherwise snaps back.
@@ -428,7 +428,7 @@ struct IslandView: View {
             }
         }
         .fixedSize(horizontal: false, vertical: true)
-        .padding(.horizontal, 14).padding(.vertical, 9)
+        .padding(.horizontal, 14).padding(.vertical, 8)
         .background(Color.white.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .opacity(model.isStale ? 0.55 : 1)
