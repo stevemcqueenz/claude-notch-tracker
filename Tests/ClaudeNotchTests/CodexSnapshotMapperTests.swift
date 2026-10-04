@@ -131,7 +131,8 @@ import Testing
 
         #expect(snapshot.limits.map(\.label) == ["5-Hour", "7-Day"])
         #expect(snapshot.limits.map(\.usedFraction) == [0.42, 0.70])
-        #expect(snapshot.primaryUsage == 0.42)
+        // The pill shows whichever window is nearer its limit — here the weekly one.
+        #expect(snapshot.primaryUsage == 0.70)
     }
 
     @Test func fillsSpareTilesWithLifetimeStatsAndFlagsSpendControl() throws {

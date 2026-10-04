@@ -49,14 +49,40 @@ struct UsageLimitMetric: Equatable, Sendable, Identifiable {
     /// Absolute spend for this window, e.g. "$3.00 of $12.00" (opencode-go's micro-cent meters).
     /// nil whenever only a bare percent is known, so every other provider renders unchanged.
     let subtitle: String?
+    /// Length of the window (5 h, 7 d, a month) when known. With `resetsAt` it places the pace
+    /// marker: how much of the window has already gone by.
+    let window: TimeInterval?
+    /// True for a limit that caps one model or model group rather than the whole account
+    /// (Claude's Fable weekly, Antigravity's inactive groups, Codex's per-model buckets). Scoped
+    /// limits still get a meter, but never lead the pill or set the icon's urgency.
+    let scoped: Bool
 
     init(id: String, label: String, usedFraction: Double?, resetsAt: Date?,
-         subtitle: String? = nil) {
+         subtitle: String? = nil, window: TimeInterval? = nil, scoped: Bool = false) {
         self.id = id
         self.label = label
         self.usedFraction = usedFraction.map { min(1, max(0, $0)) }
         self.resetsAt = resetsAt
         self.subtitle = subtitle
+        self.window = window
+        self.scoped = scoped
+    }
+
+    /// How much of the window has elapsed, 0…1. An even pace would have used exactly this much,
+    /// so usage above it means the limit runs out before it resets. nil without both a window
+    /// length and a reset time.
+    func elapsedFraction(now: Date = Date()) -> Double? {
+        guard let window, window > 0, let resetsAt else { return nil }
+        return min(1, max(0, 1 - resetsAt.timeIntervalSince(now) / window))
+    }
+
+    /// Short tag for the closed pill, so a weekly number is never mistaken for the 5-hour one:
+    /// "5h", "7d", "mo". nil when the window length is unknown.
+    var windowTag: String? {
+        guard let window, window > 0 else { return nil }
+        if window < 86_400 { return "\(Int((window / 3600).rounded()))h" }
+        if window <= 8 * 86_400 { return "\(Int((window / 86_400).rounded()))d" }
+        return "mo"
     }
 }
 
@@ -132,11 +158,34 @@ struct ProviderUsageSnapshot: Equatable, Sendable {
     /// reacts to a recent one.
     var spendObservedAt: Date?
 
-    /// The headline fraction for the collapsed pill: the FIRST limit's value, nil when that limit
-    /// has no value yet. Deliberately not "first non-nil" — falling through to a later limit would
-    /// silently show, say, a weekly number where the session number belongs, unlabeled.
+    /// The limit nearest to running out among the account-wide ones: what the closed pill shows
+    /// (tagged with its window, so a weekly figure is never read as the 5-hour one) and what sets
+    /// the icon's urgency. Scoped limits only lead when nothing else exists.
+    var bindingLimit: UsageLimitMetric? {
+        let account = limits.filter { !$0.scoped && $0.usedFraction != nil }
+        return account.max { ($0.usedFraction ?? 0) < ($1.usedFraction ?? 0) } ?? limits.first
+    }
+
+    /// The headline fraction for the collapsed pill: the binding limit's value.
     var primaryUsage: Double? {
-        limits.first?.usedFraction
+        bindingLimit?.usedFraction
+    }
+
+    /// A fetch that failed, or came back without limits, must not blank a card that had good
+    /// numbers a minute ago. This keeps the previous limits (and their `fetchedAt`, so the card
+    /// ages into the dimmed "reconnecting…" state) while taking whatever fresh data did arrive and
+    /// the new status message.
+    func keepingLastGoodReading(from previous: ProviderUsageSnapshot) -> ProviderUsageSnapshot {
+        guard previous.provider == provider,
+              limits.isEmpty, pill == nil,
+              !previous.limits.isEmpty || previous.pill != nil else { return self }
+        let nothingNew = stats.isEmpty && dailySeries.isEmpty && sessions.isEmpty
+        var kept = nothingNew ? previous : self
+        kept.limits = previous.limits
+        kept.pill = previous.pill
+        kept.fetchedAt = previous.fetchedAt
+        kept.statusMessage = statusMessage ?? previous.statusMessage
+        return kept
     }
 
     /// Total tokens across the daily series (the chart's week), nil without a daily feed.
