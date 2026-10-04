@@ -31,6 +31,8 @@ struct IslandView: View {
     private let wing: CGFloat = 56
     private let iconSize: CGFloat = 18
     private let edgeInset: CGFloat = 12   // keeps content off the pill's flared edges
+    /// The expanded cards sit further in than the closed row, so their grey never crowds the black.
+    private let dropInset: CGFloat = 18
     private var dropHeight: CGFloat { model.expandedDropHeight }
 
     private var expanded: Bool { model.isExpanded }
@@ -267,7 +269,7 @@ struct IslandView: View {
 
     // MARK: drop-down — two swipeable pages below the notch
 
-    private var contentWidth: CGFloat { closedWidth - edgeInset * 2 }
+    private var contentWidth: CGFloat { closedWidth - dropInset * 2 }
     private var pagerHeight: CGFloat { dropHeight - 29 }   // leaves room for the dots + padding
 
     private var dropDown: some View {
@@ -291,7 +293,7 @@ struct IslandView: View {
             .background(TrackpadSwipeReader(onChange: { dragX = $0 }, onEnd: endSwipe))
             pageDots
         }
-        .padding(.horizontal, edgeInset).padding(.top, 6).padding(.bottom, 9)
+        .padding(.horizontal, dropInset).padding(.top, 6).padding(.bottom, 9)
     }
 
     /// Settles a click-drag or trackpad swipe: past 40pt flips the page, otherwise snaps back.

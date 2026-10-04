@@ -586,9 +586,9 @@ final class AppModel {
 
     /// Expanded drop-down height — fixed, since the expanded view is a fixed-size two-page pager.
     /// Read by both the view and the window's click-zone. Sized for the fullest limits page —
-    /// three two-line meters in their card plus the stats strip — and capped by the 300 pt panel
-    /// minus the tallest menu bar (38 pt).
-    var expandedDropHeight: CGFloat { 260 }
+    /// three two-line meters in their card plus the stats strip — and capped by the island
+    /// window's 330 pt panel minus the tallest menu bar (38 pt).
+    var expandedDropHeight: CGFloat { 280 }
 
     /// Terminal statusline feed (fallback source for session % and context).
     private func readStatusFeed() {

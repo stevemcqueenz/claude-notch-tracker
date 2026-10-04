@@ -46,7 +46,7 @@ final class IslandWindow {
     private let panel: NotchPanel
     private let hosting: PassthroughHostingView<IslandRootView>
     private let model: AppModel
-    private let panelHeight: CGFloat = 300
+    private let panelHeight: CGFloat = 330   // closed row + AppModel.expandedDropHeight, with room
 
     init(model: AppModel) {
         self.model = model
