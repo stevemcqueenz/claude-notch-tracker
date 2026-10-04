@@ -116,21 +116,16 @@ final class AppModel {
 
     /// How urgent the icon should look (0…1) — drives Clawd's walk speed.
     ///
-    /// Claude deliberately uses only the 5-hour and 7-day limits, as before multi-provider: the
-    /// Fable weekly limit is a per-model cap, and a maxed Fable would otherwise freeze Clawd at
-    /// "out of budget" while the account still has plenty of session/weekly headroom.
+    /// The binding limit, i.e. exactly what the closed pill shows, so the icon and the pill never
+    /// disagree. Scoped limits (Claude's Fable weekly) are left out by `bindingLimit`: a maxed
+    /// per-model cap would otherwise freeze Clawd while the account still has headroom.
     var iconUrgency: Double {
-        switch selectedProvider {
-        case .claude: max(claudeSessionUsage ?? 0, weeklyUsage ?? 0)
-        case .codex: codexSnapshot.maximumUsage
-        case .antigravity: antigravitySnapshot.maximumUsage
         // No limit to run into: peak hours, which bill double, are what quicken the icon.
-        case .deepseek: deepseekSnapshot.pill?.tint == .warn ? 0.6 : 0
-        case .opencodeGo: opencodeGoSnapshot.maximumUsage
-        }
+        if selectedProvider == .deepseek { return deepseekSnapshot.pill?.tint == .warn ? 0.6 : 0 }
+        return sessionUsage ?? 0
     }
 
-    /// A limit (5-hour or 7-day) is used up — there's nothing left to spend, so Clawd stops
+    /// The binding limit is used up — there's nothing left to spend, so Clawd stops
     /// walking and stands still rather than sprinting at max speed.
     var isAtLimit: Bool {
         selectedProvider == .deepseek ? deepseekSnapshot.pill?.tint == .critical : iconUrgency >= 0.999
@@ -190,24 +185,29 @@ final class AppModel {
     private var claudeProviderSnapshot: ProviderUsageSnapshot {
         var usageLimits = [
             UsageLimitMetric(id: "claude-session", label: "5-Hour",
-                             usedFraction: claudeSessionUsage, resetsAt: sessionResetsAt),
+                             usedFraction: claudeSessionUsage, resetsAt: sessionResetsAt,
+                             window: 5 * 3600),
             UsageLimitMetric(id: "claude-weekly", label: "7-Day",
-                             usedFraction: weeklyUsage, resetsAt: weeklyResetsAt),
+                             usedFraction: weeklyUsage, resetsAt: weeklyResetsAt,
+                             window: 7 * 86_400),
         ]
         if fableUsage != nil {
             usageLimits.append(UsageLimitMetric(id: "claude-fable", label: "Fable",
-                                                usedFraction: fableUsage, resetsAt: fableResetsAt))
+                                                usedFraction: fableUsage, resetsAt: fableResetsAt,
+                                                window: 7 * 86_400, scoped: true))
         }
 
+        // "API prices" rather than "cost": on a subscription this is what the tokens would have
+        // cost at list price, not a bill.
         var stats = [
-            UsageStatMetric(id: "cost-today", label: "cost today · local",
+            UsageStatMetric(id: "cost-today", label: "today · API prices",
                             value: snapshot.isEmpty ? "—" : Fmt.usd(snapshot.costToday),
                             subtitle: projectedCostToday.map { "~\(Fmt.usd($0)) by tonight" }),
             UsageStatMetric(id: "credits", label: "credits",
                             value: creditsValue, subtitle: creditsSubtitle),
             // All-time lives here now; the detail page belongs to the week chart + sessions,
             // and "tokens today" is redundant with the chart's highlighted today bar.
-            UsageStatMetric(id: "all-time", label: "all-time · local",
+            UsageStatMetric(id: "all-time", label: "all-time · API prices",
                             value: lifetime.tokens == 0 ? "—" : Fmt.usd(lifetime.cost),
                             subtitle: lifetime.tokens == 0 ? nil : Fmt.tokens(lifetime.tokens)),
         ]
@@ -446,31 +446,37 @@ final class AppModel {
         }
     }
 
+    // Each fetch keeps the last good limits through a failed read, so one hiccup dims the card
+    // ("reconnecting…") instead of blanking it.
     func fetchCodexUsage() {
         guard !isPaused, isPolled(.codex) else { return }
         Task { [codexProvider] in
-            self.codexSnapshot = await codexProvider.fetch()
+            let fresh = await codexProvider.fetch()
+            self.codexSnapshot = fresh.keepingLastGoodReading(from: self.codexSnapshot)
         }
     }
 
     func fetchAntigravityUsage(force: Bool = false) {
         guard !isPaused, isPolled(.antigravity) else { return }
         Task { [antigravityProvider] in
-            self.antigravitySnapshot = await antigravityProvider.fetch(force: force)
+            let fresh = await antigravityProvider.fetch(force: force)
+            self.antigravitySnapshot = fresh.keepingLastGoodReading(from: self.antigravitySnapshot)
         }
     }
 
     func fetchDeepSeekUsage() {
         guard !isPaused, isPolled(.deepseek) else { return }
         Task { [deepseekProvider] in
-            self.deepseekSnapshot = await deepseekProvider.fetch()
+            let fresh = await deepseekProvider.fetch()
+            self.deepseekSnapshot = fresh.keepingLastGoodReading(from: self.deepseekSnapshot)
         }
     }
 
     func fetchOpencodeGoUsage() {
         guard !isPaused, isPolled(.opencodeGo) else { return }
         Task { [opencodeGoProvider] in
-            self.opencodeGoSnapshot = await opencodeGoProvider.fetch()
+            let fresh = await opencodeGoProvider.fetch()
+            self.opencodeGoSnapshot = fresh.keepingLastGoodReading(from: self.opencodeGoSnapshot)
         }
     }
 
@@ -579,8 +585,9 @@ final class AppModel {
     }
 
     /// Expanded drop-down height — fixed, since the expanded view is a fixed-size two-page pager.
-    /// Read by both the view and the window's click-zone.
-    var expandedDropHeight: CGFloat { 234 }
+    /// Read by both the view and the window's click-zone. Sized for the fullest limits page:
+    /// four meters, two stat tiles and the status line (or three meters plus the ETA line).
+    var expandedDropHeight: CGFloat { 244 }
 
     /// Terminal statusline feed (fallback source for session % and context).
     private func readStatusFeed() {

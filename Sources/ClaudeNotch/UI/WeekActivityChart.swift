@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Seven-day account-activity bar chart for the limits page: one bar per calendar day, today
+/// Seven-day account-activity bar chart for the activity page: one bar per calendar day, today
 /// highlighted, the peak day labeled with its count, and the week total in the header. Fills
 /// whatever height the page gives it, so it works as the page's centerpiece tile.
 struct WeekActivityChart: View {

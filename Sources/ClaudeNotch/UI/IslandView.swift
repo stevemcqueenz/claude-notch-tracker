@@ -15,22 +15,21 @@ struct IslandRootView: View {
 }
 
 /// The notch-fused black island. Closed: Clawd + session-% flanking the camera. Expanded: it
-/// grows taller (never wider), dropping a tile grid below the notch. The NotchShape's radii
-/// animate, so it morphs like the notch itself growing.
+/// grows taller (never wider), dropping limit meters and tiles below the notch. The NotchShape's
+/// radii animate, so it morphs like the notch itself growing.
 struct IslandView: View {
     let model: AppModel
     let notchWidth: CGFloat
     let topInset: CGFloat
 
-    /// 5-Hour tile: false = show burn-rate ETA when available, true = always show reset.
-    @State private var prefReset = false
-    /// Expanded view is a two-page pager: 0 = limits, 1 = local detail. dragX tracks a live swipe.
+    /// Expanded view is a two-page pager: 0 = limits, 1 = activity. dragX tracks a live swipe.
     @State private var page = 0
     @State private var dragX: CGFloat = 0
     /// The sessions block flips between today's active sessions and all-time top projects on tap.
     @State private var showAllTime = false
 
-    private let wing: CGFloat = 56
+    /// Wide enough for "100% 7d" plus the ring; both wings match so the island stays centred.
+    private let wing: CGFloat = 62
     private let iconSize: CGFloat = 18
     private let edgeInset: CGFloat = 12   // keeps content off the pill's flared edges
     private var dropHeight: CGFloat { model.expandedDropHeight }
@@ -208,9 +207,16 @@ struct IslandView: View {
                     }
                 } else {
                     HStack(spacing: 5) {
-                        Text(provider.primaryUsage.map(Fmt.pct) ?? "—")
-                            .font(.system(size: 12, weight: .semibold)).monospacedDigit()
-                            .foregroundStyle(.white)
+                        HStack(alignment: .firstTextBaseline, spacing: 2) {
+                            Text(provider.primaryUsage.map(Fmt.pct) ?? "—")
+                                .font(.system(size: 12, weight: .semibold)).monospacedDigit()
+                                .foregroundStyle(.white)
+                            if let tag = pillWindowTag {
+                                Text(tag).font(.system(size: 9, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.5))
+                            }
+                        }
+                        .lineLimit(1).minimumScaleFactor(0.8)
                         Ring(fraction: used, state: ringState(for: used), lineWidth: 3)
                             .frame(width: 14, height: 14)
                     }
@@ -224,11 +230,27 @@ struct IslandView: View {
             .onTapGesture { model.isExpanded.toggle() }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(model.selectedProvider.displayName) usage")
-            .accessibilityValue(provider.pill?.text ?? provider.primaryUsage.map(Fmt.pct) ?? "unknown")
+            .accessibilityValue(pillSpokenValue)
             .accessibilityHint(model.isExpanded ? "Collapses the usage card" : "Expands the usage card")
             .accessibilityAddTraits(.isButton)
         }
         .padding(.horizontal, edgeInset)
+    }
+
+    /// "7d" beside the pill's percent when the binding limit isn't the provider's first one, so a
+    /// weekly figure is never read as the 5-hour one. nil in the usual case: no extra chrome.
+    private var pillWindowTag: String? {
+        let s = provider
+        guard let binding = s.bindingLimit, binding.id != s.limits.first?.id else { return nil }
+        return binding.windowTag
+    }
+
+    /// "42%", or "42%, 7-Day limit" when the pill shows a window tag.
+    private var pillSpokenValue: String {
+        if let pill = provider.pill { return pill.text }
+        guard let usage = provider.primaryUsage else { return "unknown" }
+        guard pillWindowTag != nil, let label = provider.bindingLimit?.label else { return Fmt.pct(usage) }
+        return "\(Fmt.pct(usage)), \(label) limit"
     }
 
     @ViewBuilder private var providerIcon: some View {
@@ -335,62 +357,86 @@ struct IslandView: View {
         return s.limits.isEmpty && s.stats.isEmpty && s.dailySeries.isEmpty && s.sessions.isEmpty
     }
 
+    private static let amber = Color(red: 0.96, green: 0.70, blue: 0.20)
+
+    /// Account-wide limits first, then per-model ones; four meters is all the page holds.
+    private var meterLimits: [UsageLimitMetric] {
+        let limits = provider.limits
+        return Array((limits.filter { !$0.scoped } + limits.filter(\.scoped)).prefix(4))
+    }
+
     private var pageLimits: some View {
         let snapshot = provider
-        // With a daily feed, the page is limits + the week chart as centerpiece; the plain
-        // six-tile grid remains for providers/accounts without one (API-key Codex) and for
-        // providers that keep the chart on the detail page (Claude, whose limit tiles fill this
-        // one). More than two limit windows also falls back — the windows outrank the chart.
-        let chartLayout = chartOnLimitsPage
-        let gridSlots = chartLayout ? 2 : 6
-        let remainingSlots = max(0, gridSlots - snapshot.limits.count)
         return VStack(spacing: 8) {
             if providerHasNothingToShow {
                 providerPlaceholder
             } else {
-                LazyVGrid(columns: [.init(.flexible(), spacing: 8), .init(.flexible(), spacing: 8)], spacing: 8) {
-                    ForEach(Array(snapshot.limits.prefix(gridSlots))) { metric in
-                        providerLimitTile(metric)
+                if snapshot.limits.isEmpty {
+                    // Nothing to meter (DeepSeek): the stat tiles are the page.
+                    LazyVGrid(columns: [.init(.flexible(), spacing: 8), .init(.flexible(), spacing: 8)], spacing: 8) {
+                        ForEach(Array(snapshot.stats.prefix(6))) { metric in
+                            tile(metric.label, metric.value, height: .compact, sub: metric.subtitle,
+                                 tint: metric.tint)
+                        }
                     }
-                    ForEach(Array(snapshot.stats.prefix(remainingSlots))) { metric in
-                        tile(metric.label, metric.value, height: .compact, sub: metric.subtitle,
-                             tint: metric.tint)
+                    .opacity(model.isStale ? 0.55 : 1)      // dim live numbers when not fresh
+                } else {
+                    VStack(spacing: 5) {
+                        ForEach(meterLimits) { LimitMeterRow(metric: $0) }
+                        // Claude only: the 5-hour trend says the limit lands before the reset.
+                        if let eta = model.etaToLimit {
+                            Text("~\(Fmt.dur(eta)) to limit at this pace")
+                                .font(.system(size: 10, weight: .medium)).lineLimit(1)
+                                .foregroundStyle(Self.amber)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
-                }
-                .opacity(model.isStale ? 0.55 : 1)         // dim live limits when not fresh
-                if chartLayout {
-                    WeekActivityChart(series: snapshot.dailySeries, title: snapshot.chartTitle,
-                                      currency: snapshot.currency)
+                    .opacity(model.isStale ? 0.55 : 1)
+                    if !snapshot.stats.isEmpty {
+                        HStack(spacing: 8) {
+                            ForEach(Array(snapshot.stats.prefix(3))) { metric in
+                                tile(metric.label, metric.value, height: .compact, sub: metric.subtitle,
+                                     tint: metric.tint)
+                            }
+                        }
                         .opacity(model.isStale ? 0.55 : 1)
+                    }
                 }
-                if let message = snapshot.statusMessage {
-                    Spacer(minLength: 0)
-                    Text(message).font(.system(size: 10))
-                        .foregroundStyle(Color(red: 0.96, green: 0.70, blue: 0.20))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .lineLimit(1).truncationMode(.tail)
-                } else if model.isStale {                   // only surface a problem, never chrome
-                    Spacer(minLength: 0)
-                    Text("reconnecting…").font(.system(size: 10))
-                        .foregroundStyle(Color(red: 0.96, green: 0.70, blue: 0.20))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                // A frame, not a Spacer: a Spacer would cost two stack gaps of the page's height.
+                statusLine.frame(maxHeight: .infinity, alignment: .bottom)
             }
         }
     }
 
-    /// True when the limits page hosts the week chart (Codex-style); the detail page then keeps
-    /// its stat tiles. When false and a series exists (Claude), the chart lives on the detail page.
-    private var chartOnLimitsPage: Bool {
-        let s = provider
-        return !s.dailySeries.isEmpty && !s.chartOnDetailPage && s.limits.count <= 2
+    /// A problem in amber when there is one; otherwise a quiet note of how fresh the numbers are.
+    @ViewBuilder private var statusLine: some View {
+        let snapshot = provider
+        if let message = snapshot.statusMessage {
+            Text(message).font(.system(size: 10))
+                .foregroundStyle(Self.amber)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .lineLimit(1).truncationMode(.tail)
+        } else if model.isStale {
+            Text("reconnecting…").font(.system(size: 10))
+                .foregroundStyle(Self.amber)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else if snapshot.fetchedAt != nil || snapshot.source != nil {
+            // Ticks on its own: between fetches nothing else re-renders the page.
+            TimelineView(.periodic(from: .now, by: 10)) { _ in
+                Text(([snapshot.fetchedAt.map { "updated \(Fmt.ago($0)) ago" }, snapshot.source]
+                      as [String?]).compactMap { $0 }.joined(separator: " · "))
+                    .font(.system(size: 9.5)).monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.35))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .lineLimit(1).truncationMode(.tail)
+            }
+        }
     }
 
-    // Page 2 — provider detail: the week chart (when page 1 is full of limit tiles) or the
-    // today/all-time totals, above recent sessions/tasks.
+    // Page 2 — activity, the same for every provider: the week chart (or, without a daily feed,
+    // the today/all-time totals) above recent sessions/tasks.
     private var pageLocal: some View {
         let snapshot = provider
-        let chartHere = !snapshot.dailySeries.isEmpty && !chartOnLimitsPage
         // A bare "today: —" tile is dead weight. When the provider has no today figure but does
         // have a daily feed, show the week total instead — always a real number.
         let showWeek = snapshot.todayCost == nil && snapshot.todayTokens == nil
@@ -401,7 +447,7 @@ struct IslandView: View {
         return VStack(spacing: 8) {
             if providerHasNothingToShow {
                 providerPlaceholder
-            } else if chartHere {
+            } else if !snapshot.dailySeries.isEmpty {
                 WeekActivityChart(series: snapshot.dailySeries, title: snapshot.chartTitle,
                                   currency: snapshot.currency)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -524,42 +570,6 @@ struct IslandView: View {
         .frame(minHeight: 20)
     }
 
-    @ViewBuilder private func providerLimitTile(_ metric: UsageLimitMetric) -> some View {
-        let isClaudeSession = metric.id == "claude-session"
-        limitTile(metric.label, metric.usedFraction, resets: metric.resetsAt,
-                  eta: isClaudeSession && !prefReset ? model.etaToLimit : nil,
-                  subtitle: metric.subtitle)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                if isClaudeSession, model.etaToLimit != nil { prefReset.toggle() }
-            }
-    }
-
-    // A limit tile: label, big colour-coded %, a "resets in …" subline, and — for opencode-go's
-    // micro-cent meters — an absolute-spend subline. The subtitle is nil for every other provider,
-    // so their pixels are unchanged.
-    private func limitTile(_ label: String, _ value: Double?, resets: Date?,
-                           eta: TimeInterval? = nil, subtitle: String? = nil) -> some View {
-        tileBox {
-            Text(label).font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
-            Text(value.map(Fmt.pct) ?? "—")
-                .font(.system(size: 15, weight: .semibold)).monospacedDigit()
-                .foregroundStyle(barColor(value ?? 0))
-            if let eta {
-                Text("~\(Fmt.dur(eta)) to limit")
-                    .font(.system(size: 9.5, weight: .medium)).lineLimit(1)
-                    .foregroundStyle(Color(red: 0.96, green: 0.70, blue: 0.20))
-            } else {
-                Text(resets.map { "resets in \(Fmt.until($0))" } ?? "resets —")
-                    .font(.system(size: 9.5)).foregroundStyle(.white.opacity(0.45)).lineLimit(1)
-            }
-            if let subtitle {
-                Text(subtitle).font(.system(size: 9.5)).monospacedDigit()
-                    .foregroundStyle(.white.opacity(0.4)).lineLimit(1).minimumScaleFactor(0.7)
-            }
-        }
-    }
-
     enum TileHeight { case compact, tall
         var minHeight: CGFloat { self == .compact ? 54 : 54 }   // page-1 tiles are uniform, compact
         var valueSize: CGFloat { self == .compact ? 15 : 17 }
@@ -570,6 +580,7 @@ struct IslandView: View {
                       tint: UsageTint? = nil) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(label).font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
+                .lineLimit(1).minimumScaleFactor(0.75)
             Text(value).font(.system(size: height.valueSize, weight: .medium)).monospacedDigit()
                 .foregroundStyle(tint.map(color) ?? .white).lineLimit(1).minimumScaleFactor(0.7)
             if let sub {
@@ -581,22 +592,6 @@ struct IslandView: View {
         .padding(.horizontal, 10).padding(.vertical, 5)
         .background(Color.white.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 10))
-    }
-
-    private func tileBox<C: View>(@ViewBuilder _ content: () -> C) -> some View {
-        VStack(alignment: .leading, spacing: 1, content: content)
-            .frame(maxWidth: .infinity, minHeight: 54, alignment: .topLeading)
-            .padding(.horizontal, 10).padding(.vertical, 5)
-            .background(Color.white.opacity(0.06))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-    }
-
-    private func barColor(_ used: Double) -> Color {
-        switch ringState(for: used) {
-        case .ok: return .white
-        case .warn: return Color(red: 0.96, green: 0.70, blue: 0.20)
-        case .critical: return Color(red: 0.92, green: 0.34, blue: 0.34)
-        }
     }
 
     /// A state colour: the warn/critical of the limit tiles, and green for a good state, since
