@@ -25,7 +25,19 @@ let package = Package(
                 .copy("Resources/holiday-cn-2026.json"),
                 .copy("Resources/holiday-cn-LICENSE.txt"),
             ],
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            swiftSettings: [.swiftLanguageMode(.v6)],
+            // `swift run`: newer SwiftPM no longer copies Sparkle.framework next to the debug
+            // binary, so point dyld at the downloaded xcframework — from the Xcode build-system
+            // layout (.build/out/Products/Debug) and the classic one (.build/<triple>/debug).
+            // Debug only: scripts/make-app.sh embeds the framework in release builds.
+            linkerSettings: [
+                .unsafeFlags([
+                    "-Xlinker", "-rpath", "-Xlinker",
+                    "@executable_path/../../../artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64",
+                    "-Xlinker", "-rpath", "-Xlinker",
+                    "@executable_path/../../artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64",
+                ], .when(configuration: .debug)),
+            ]
         ),
         .testTarget(
             name: "ClaudeNotchTests",
