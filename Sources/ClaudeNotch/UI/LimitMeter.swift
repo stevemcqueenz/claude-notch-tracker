@@ -31,7 +31,7 @@ struct LimitMeterRow: View {
             bar(used: used, elapsed: elapsed)
                 .padding(.top, 4).padding(.bottom, 3)
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(metric.resetsAt.map { "resets in \(Fmt.until($0))" } ?? "resets —")
+                Text(metric.resetsAt.map { "resets in \(Fmt.until($0))" } ?? metric.windowLabel ?? "resets —")
                     .foregroundStyle(.white.opacity(0.4))
                 Spacer(minLength: 0)
                 if let right = warning ?? metric.subtitle {
@@ -83,6 +83,8 @@ struct LimitMeterRow: View {
             if let s = f.string(from: max(0, resetsAt.timeIntervalSinceNow)) {
                 parts.append("resets in \(s)")
             }
+        } else if let window = metric.windowLabel {
+            parts.append(window)
         }
         if let warning { parts.append(warning) }
         return parts.joined(separator: ", ")

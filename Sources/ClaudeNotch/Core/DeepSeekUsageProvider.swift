@@ -36,7 +36,7 @@ actor DeepSeekUsageProvider {
     }
 
     func fetch(now: Date = Date()) async -> ProviderUsageSnapshot {
-        if cachedKey == nil, !keyRejected { cachedKey = DeepSeekCredentials.read() }
+        if cachedKey == nil, !keyRejected { cachedKey = APIKeyCredentials.deepseek.read() }
         guard cachedKey != nil || keyRejected else {
             return .unavailable(.deepseek, message: UsageProviderID.deepseek.setupHint)
         }

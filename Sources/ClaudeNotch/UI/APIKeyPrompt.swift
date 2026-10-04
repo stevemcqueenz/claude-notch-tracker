@@ -1,23 +1,24 @@
 import AppKit
 
-/// The right-click menu's "DeepSeek API Key…": a secure field that saves the key to the login
+/// The right-click menu's "<Provider> API Key…": a secure field that saves the key to the login
 /// Keychain, or removes the saved one. There is no settings window to put this in, and a key is
 /// a one-off, so a modal alert is enough.
 @MainActor
-enum DeepSeekKeyPrompt {
-    static func run(onChange: @escaping @MainActor () -> Void) {
+enum APIKeyPrompt {
+    /// `about` says where to create the key and where it will be sent.
+    static func run(provider: String, credentials: APIKeyCredentials, about: String,
+                    placeholder: String, onChange: @escaping @MainActor () -> Void) {
         let alert = NSAlert()
-        alert.messageText = "DeepSeek API Key"
-        let hasStored = DeepSeekCredentials.isConfigured && DeepSeekCredentials.environmentKey == nil
-        var info = "Create a key at platform.deepseek.com/api_keys. It is stored in your Keychain "
-            + "and only ever sent to api.deepseek.com, to read your balance."
-        if DeepSeekCredentials.environmentKey != nil {
-            info += "\n\nDEEPSEEK_API_KEY is set in this app's environment and takes precedence."
+        alert.messageText = "\(provider) API Key"
+        let hasStored = credentials.isConfigured && credentials.environmentKey == nil
+        var info = about
+        if credentials.environmentKey != nil {
+            info += "\n\n\(credentials.environmentVariable) is set in this app's environment and takes precedence."
         }
         alert.informativeText = info
 
         let field = EditableSecureField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
-        field.placeholderString = hasStored ? "Saved — paste a new key to replace it" : "sk-…"
+        field.placeholderString = hasStored ? "Saved — paste a new key to replace it" : placeholder
         alert.accessoryView = field
         alert.addButton(withTitle: "Save")
         alert.addButton(withTitle: "Cancel")
@@ -28,10 +29,10 @@ enum DeepSeekKeyPrompt {
         NSApp.activate(ignoringOtherApps: true)
         switch alert.runModal() {
         case .alertFirstButtonReturn:
-            guard DeepSeekCredentials.save(field.stringValue) else { return }
+            guard credentials.save(field.stringValue) else { return }
             onChange()
         case .alertThirdButtonReturn:
-            DeepSeekCredentials.remove()
+            credentials.remove()
             onChange()
         default:
             return

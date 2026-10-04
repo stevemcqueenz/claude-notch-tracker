@@ -47,6 +47,7 @@ struct IslandView: View {
     @MainActor private static let antigravityIcon: NSImage? = mark(named: "antigravity")
     @MainActor private static let deepseekIcon: NSImage? = mark(named: "deepseek")
     @MainActor private static let opencodegoIcon: NSImage? = mark(named: "opencodego")
+    @MainActor private static let ollamaIcon: NSImage? = mark(named: "ollama")
 
     /// Resolves a bundled provider mark, preferring the packaged .app layout over SwiftPM's.
     private static func mark(named name: String) -> NSImage? {
@@ -72,6 +73,7 @@ struct IslandView: View {
         case .antigravity: antigravityIcon
         case .deepseek: deepseekIcon
         case .opencodeGo: opencodegoIcon
+        case .ollamaCloud: ollamaIcon
         }
     }
 
@@ -148,8 +150,21 @@ struct IslandView: View {
                 }
             }
         }
-        Button(DeepSeekCredentials.isConfigured ? "DeepSeek API Key… ✓" : "DeepSeek API Key…") {
-            DeepSeekKeyPrompt.run { model.deepSeekCredentialsChanged() }
+        Button(APIKeyCredentials.deepseek.isConfigured ? "DeepSeek API Key… ✓" : "DeepSeek API Key…") {
+            APIKeyPrompt.run(
+                provider: "DeepSeek", credentials: .deepseek,
+                about: "Create a key at platform.deepseek.com/api_keys. It is stored in your Keychain "
+                    + "and only ever sent to api.deepseek.com, to read your balance.",
+                placeholder: "sk-…"
+            ) { model.deepSeekCredentialsChanged() }
+        }
+        Button(APIKeyCredentials.ollama.isConfigured ? "Ollama API Key… ✓" : "Ollama API Key…") {
+            APIKeyPrompt.run(
+                provider: "Ollama", credentials: .ollama,
+                about: "Create a key at ollama.com/settings/keys. It is stored in your Keychain "
+                    + "and only ever sent to ollama.com, to read your usage.",
+                placeholder: "Paste your key"
+            ) { model.ollamaCredentialsChanged() }
         }
         Button("Refresh now") { model.refreshNow() }
         Button(model.isPaused ? "Resume tracking" : "Pause tracking") { model.togglePause() }

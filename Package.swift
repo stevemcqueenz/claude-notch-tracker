@@ -19,6 +19,8 @@ let package = Package(
                 .copy("Resources/opencodego.png"),
                 // DeepSeek's mark from LobeIcons (MIT, see LobeIcons-LICENSE.txt).
                 .copy("Resources/deepseek.png"),
+                // Ollama's mark, also from LobeIcons.
+                .copy("Resources/ollama.png"),
                 .copy("Resources/LobeIcons-LICENSE.txt"),
                 // China's statutory holidays for DeepSeek's off-peak rule, from holiday-cn (MIT).
                 // Later years are fetched at runtime; see ChineseHolidaySource.

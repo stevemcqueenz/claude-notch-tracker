@@ -6,6 +6,7 @@ enum UsageProviderID: String, CaseIterable, Identifiable, Sendable {
     case antigravity
     case deepseek
     case opencodeGo
+    case ollamaCloud
 
     var id: String { rawValue }
 
@@ -16,6 +17,7 @@ enum UsageProviderID: String, CaseIterable, Identifiable, Sendable {
         case .antigravity: "Antigravity"
         case .deepseek: "DeepSeek"
         case .opencodeGo: "opencode-go"
+        case .ollamaCloud: "Ollama Cloud"
         }
     }
 
@@ -27,6 +29,7 @@ enum UsageProviderID: String, CaseIterable, Identifiable, Sendable {
         case .antigravity: "Install the Antigravity CLI to track usage here"
         case .deepseek: "Add a DeepSeek API key from the right-click menu"
         case .opencodeGo: "Use opencode locally or sign in to opencode.ai in your browser"
+        case .ollamaCloud: "Add an Ollama API key from the right-click menu"
         }
     }
 
@@ -37,6 +40,7 @@ enum UsageProviderID: String, CaseIterable, Identifiable, Sendable {
         case .antigravity: "mountain.2.fill"
         case .deepseek: "fish.fill"
         case .opencodeGo: "chevron.left.forwardslash.chevron.right"
+        case .ollamaCloud: "cloud.fill"
         }
     }
 }
@@ -66,6 +70,15 @@ struct UsageLimitMetric: Equatable, Sendable, Identifiable {
         self.subtitle = subtitle
         self.window = window
         self.scoped = scoped
+    }
+
+    /// "5-hour window" / "7-day window": all a limit with no reset time (Ollama) can say about
+    /// when it frees up.
+    var windowLabel: String? {
+        guard let window else { return nil }
+        let hours = Int((window / 3600).rounded())
+        guard hours > 0 else { return nil }
+        return hours % 24 == 0 ? "\(hours / 24)-day window" : "\(hours)-hour window"
     }
 
     /// How much of the window has elapsed, 0…1. An even pace would have used exactly this much,

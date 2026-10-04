@@ -49,11 +49,13 @@ enum ProviderAvailability {
             AntigravityPaths.executable() != nil || !AntigravityPaths.conversationStores().isEmpty
         // A key in the environment or one saved from the menu; the saved one is known from a
         // flag, so this never reads the Keychain.
-        case .deepseek: DeepSeekCredentials.isConfigured
+        case .deepseek: APIKeyCredentials.deepseek.isConfigured
         // Local gateway key or local history: file-existence only, never the Keychain.
         // The web-cookie path upgrades the numbers once offered; it needs no new secret.
         case .opencodeGo:
             OpencodeGoPaths.hasAuth || OpencodeGoPaths.databaseExists
+        // Like DeepSeek: a key in the environment or a flag for the saved one.
+        case .ollamaCloud: APIKeyCredentials.ollama.isConfigured
         }
     }
 }

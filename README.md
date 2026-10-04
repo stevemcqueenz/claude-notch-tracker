@@ -4,7 +4,7 @@
 
 # Claude Notch
 
-**AI usage limits in your Mac's notch, for Claude, Codex, Antigravity, DeepSeek and opencode-go.**<br/>
+**AI usage limits in your Mac's notch, for Claude, Codex, Antigravity, DeepSeek, opencode-go and Ollama Cloud.**<br/>
 Limits, resets, tokens and cost, one click away.
 
 <br/>
@@ -37,8 +37,8 @@ spend and sessions behind. Click away and it glides shut. No Dock icon, no menu-
 3. **Keep it around.** Right-click the island and choose *Launch at Login*.
 
 You need macOS 14 or later (Apple Silicon or Intel) and at least one of: a signed-in Claude session,
-an authenticated Codex installation, an Antigravity CLI (`agy`) login, a DeepSeek API key, or an
-opencode-go account.
+an authenticated Codex installation, an Antigravity CLI (`agy`) login, a DeepSeek API key, an
+opencode-go account, or an Ollama API key.
 
 <details>
 <summary><b>Build from source</b></summary>
@@ -103,6 +103,7 @@ island rotate on its own every 10 s, 30 s or minute (it holds still while the ca
 | <img src="docs/readme/chip-antigravity.png" width="32" alt=""> | **Antigravity** | Quota windows, tokens, models, projects, week chart | The `agy` CLI's read-only `/usage` command (spends no quota), plus its local conversation stores |
 | <img src="docs/readme/chip-deepseek.png" width="32" alt=""> | **DeepSeek** | Balance, peak or off-peak pricing right now, spend today and this week | Your DeepSeek API key. Spend is observed from the balance going down, and labelled so |
 | <img src="docs/readme/chip-opencodego.png" width="32" alt=""> | **opencode-go** | 5-hour, weekly and monthly meters, renewals, Zen balance, sessions | Your opencode.ai browser session, with local history as the fallback |
+| <img src="docs/readme/chip-ollama.png" width="32" alt=""> | **Ollama Cloud** | 5-hour and 7-day meters (or the 4-week spend on a credit plan), requests per model this week | Your Ollama API key |
 
 ## Features
 
@@ -134,7 +135,7 @@ island rotate on its own every 10 s, 30 s or minute (it holds still while the ca
 | **Swipe** left or right, or tap the dots | Switch between the limits page and the detail page |
 | **Tap** the sessions block | Flip between today's sessions and all-time top projects |
 | **Click** the left icon | Cycle through your installed providers |
-| **Right-click** the island | Provider, Icon, DeepSeek API Key, Rotate providers, Pause, Animate icon, Hide in full screen, Launch at Login, Check for Updates, GitHub Repository, Quit |
+| **Right-click** the island | Provider, Icon, DeepSeek API Key, Ollama API Key, Rotate providers, Pause, Animate icon, Hide in full screen, Launch at Login, Check for Updates, GitHub Repository, Quit |
 
 ## Privacy
 
@@ -178,7 +179,7 @@ See [Provider Architecture](docs/providers.md) for every data source and securit
   ([claude-status-bar](https://github.com/m1ckc3s/claude-status-bar), MIT).
 - Notch shape and Dynamic Island approach inspired by
   [pookify](https://github.com/eyadhammouda/pookify) (MIT).
-- DeepSeek mark from [LobeIcons](https://github.com/lobehub/lobe-icons) (MIT); Chinese holiday
+- DeepSeek and Ollama marks from [LobeIcons](https://github.com/lobehub/lobe-icons) (MIT); Chinese holiday
   dates from [holiday-cn](https://github.com/NateScarlet/holiday-cn) (MIT).
 - "Claude" and the spark are trademarks of Anthropic, PBC, used nominatively.
 - "Codex" and the Codex logo are trademarks of OpenAI, used nominatively.

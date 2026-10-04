@@ -8,6 +8,7 @@ final class AppModel {
     private(set) var antigravitySnapshot: ProviderUsageSnapshot = .unavailable(.antigravity)
     private(set) var deepseekSnapshot: ProviderUsageSnapshot = .unavailable(.deepseek)
     private(set) var opencodeGoSnapshot: ProviderUsageSnapshot = .unavailable(.opencodeGo)
+    private(set) var ollamaCloudSnapshot: ProviderUsageSnapshot = .unavailable(.ollamaCloud)
     /// The stored choice, or Claude. Note this is the *saved* preference: `start()` may show a
     /// different provider when the saved one isn't installed, without overwriting this, so the
     /// choice comes back if the tool is reinstalled.
@@ -59,6 +60,7 @@ final class AppModel {
     private let antigravityProvider = AntigravityUsageProvider()
     private let opencodeGoProvider = OpencodeGoUsageProvider()
     private let deepseekProvider = DeepSeekUsageProvider()
+    private let ollamaCloudProvider = OllamaCloudUsageProvider()
     private let lifetimeScanner = LifetimeScanner()
     private var watcher: LogWatcher?
     private var ticker: Timer?
@@ -173,6 +175,7 @@ final class AppModel {
         case .antigravity: snapshot = antigravitySnapshot
         case .deepseek: snapshot = deepseekSnapshot
         case .opencodeGo: snapshot = opencodeGoSnapshot
+        case .ollamaCloud: snapshot = ollamaCloudSnapshot
         }
         // Picking a provider that isn't installed is a setup state, not a failure: say what to do
         // instead of showing the raw "executable not found" in warning amber.
@@ -289,6 +292,7 @@ final class AppModel {
                 self?.fetchAntigravityUsage()
                 self?.fetchDeepSeekUsage()
                 self?.fetchOpencodeGoUsage()
+                self?.fetchOllamaCloudUsage()
             }
         }
         Task.detached(priority: .utility) { [weak self] in
@@ -300,6 +304,7 @@ final class AppModel {
         fetchAntigravityUsage()
         fetchDeepSeekUsage()
         fetchOpencodeGoUsage()
+        fetchOllamaCloudUsage()
         scanLifetime()
         restartRotation()
         lifetimeTimer = Timer.scheduledTimer(withTimeInterval: 600, repeats: true) { [weak self] _ in
@@ -325,6 +330,7 @@ final class AppModel {
         case .antigravity: fetchAntigravityUsage(force: true)
         case .deepseek: fetchDeepSeekUsage()
         case .opencodeGo: fetchOpencodeGoUsage()
+        case .ollamaCloud: fetchOllamaCloudUsage()
         }
     }
 
@@ -337,6 +343,7 @@ final class AppModel {
             fetchAntigravityUsage()
             fetchDeepSeekUsage()
             fetchOpencodeGoUsage()
+            fetchOllamaCloudUsage()
         }
     }
     func selectProvider(_ provider: UsageProviderID) {
@@ -357,6 +364,7 @@ final class AppModel {
         case .antigravity: fetchAntigravityUsage()
         case .deepseek: fetchDeepSeekUsage()
         case .opencodeGo: fetchOpencodeGoUsage()
+        case .ollamaCloud: fetchOllamaCloudUsage()
         }
     }
 
@@ -376,6 +384,7 @@ final class AppModel {
             fetchAntigravityUsage()
             fetchDeepSeekUsage()
             fetchOpencodeGoUsage()
+            fetchOllamaCloudUsage()
         }
     }
 
@@ -480,18 +489,40 @@ final class AppModel {
         }
     }
 
+    func fetchOllamaCloudUsage() {
+        guard !isPaused, isPolled(.ollamaCloud) else { return }
+        Task { [ollamaCloudProvider] in
+            let fresh = await ollamaCloudProvider.fetch()
+            self.ollamaCloudSnapshot = fresh.keepingLastGoodReading(from: self.ollamaCloudSnapshot)
+        }
+    }
+
     /// After the key is set or removed from the menu: re-detect, re-read the key, refetch.
     func deepSeekCredentialsChanged() {
         ProviderAvailability.invalidate()
         Task { [deepseekProvider] in
             await deepseekProvider.resetCredentials()
-            if DeepSeekCredentials.isConfigured {
+            if APIKeyCredentials.deepseek.isConfigured {
                 self.selectProvider(.deepseek)
             } else {
                 self.deepseekSnapshot = .unavailable(.deepseek)
                 if self.selectedProvider == .deepseek, let first = ProviderAvailability.available().first {
                     self.selectProvider(first)
                 }
+            }
+        }
+    }
+
+    func ollamaCredentialsChanged() {
+        ProviderAvailability.invalidate()
+        Task { [ollamaCloudProvider] in
+            await ollamaCloudProvider.resetCredentials()
+            // A different key may be a different account: its numbers aren't the old ones' last good reading.
+            self.ollamaCloudSnapshot = .unavailable(.ollamaCloud)
+            if APIKeyCredentials.ollama.isConfigured {
+                self.selectProvider(.ollamaCloud)
+            } else if self.selectedProvider == .ollamaCloud, let first = ProviderAvailability.available().first {
+                self.selectProvider(first)
             }
         }
     }

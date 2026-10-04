@@ -1,6 +1,6 @@
 # Provider Architecture
 
-Claude Notch supports Claude, Codex, Antigravity, DeepSeek and opencode-go through a shared `ProviderUsageSnapshot`
+Claude Notch supports Claude, Codex, Antigravity, DeepSeek, opencode-go and Ollama Cloud through a shared `ProviderUsageSnapshot`
 model. The UI only renders normalized limits, statistics, recent activity, plan metadata, and
 status information; each provider owns its data acquisition and mapping logic.
 
@@ -183,6 +183,35 @@ GET https://api.deepseek.com/user/balance   (Authorization: Bearer <key>)
 
 DeepSeek has no limit window, so instead of a percent ring the pill shows the balance and a dot
 for the phase: green off-peak, amber at peak, red when the balance is too low for API calls.
+
+## Ollama Cloud
+
+Ollama Cloud reports its plan limits and recent spend from one endpoint:
+
+```
+GET https://ollama.com/api/usage   (Authorization: Bearer <key>)
+```
+
+- **The key** comes from `OLLAMA_API_KEY` in the app's environment, or from the right-click
+  menu's *Ollama API Key…*, which stores it in the login Keychain under its own item. As with
+  DeepSeek it is read once, sent nowhere but ollama.com, and availability is known from a flag
+  rather than a Keychain read. After a 401 the Keychain is not read again until the key is changed.
+- **Limits**: `limits.session.usage` and `limits.weekly.usage` are used fractions of a 5-hour and
+  a 7-day window, shown as two meters. The API gives no reset times, so the meters say
+  "5-hour window" / "7-day window" where other providers count down, and draw no pace marker.
+- **Credit plans.** Plans started from 2026-08-31 bill against a monthly credit pool instead.
+  Zero limits are not taken as a sign of one, because a 5-hour/weekly plan unused this week
+  reads 0 too: whenever the response has `limits.session` or `limits.weekly` the meters show,
+  even at 0 %. Only a response with neither is treated as a credit plan: no meters, and the pill
+  shows the last 4 weeks' spend.
+- **Spend** is `activity.cost` (e.g. "$12.34"), shown as the "last 4 weeks" tile as Ollama
+  formats it; it is parsed to a number only for the credit-plan pill.
+- **Models**: the weekly per-model request counts, most requests first. Ollama has sent
+  `models` both as an array of `{name, request_count}` and as an object keyed by model name;
+  both are read.
+
+Not available from the API: a credit balance or remaining credits, reset times, tokens, and
+daily history, so there is no week chart.
 
 ## Rotation
 
