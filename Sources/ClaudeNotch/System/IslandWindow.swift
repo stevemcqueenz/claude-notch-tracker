@@ -81,7 +81,7 @@ final class IslandWindow {
     func updateInteractiveZone() {
         let closedH = max(model.topInset, 30)
         let dropH = model.expandedDropHeight
-        let zoneW = model.notchWidth + 62 * 2 + 24 + 24    // wing+gap+wing + edge insets + margin
+        let zoneW = model.notchWidth + 56 * 2 + 24 + 24    // wing+gap+wing + edge insets + margin
         let zoneH = (model.isExpanded ? closedH + dropH + 8 : closedH + 6)
         let w = hosting.bounds.width
         let h = hosting.bounds.height

@@ -28,8 +28,7 @@ struct IslandView: View {
     /// The sessions block flips between today's active sessions and all-time top projects on tap.
     @State private var showAllTime = false
 
-    /// Wide enough for "100% 7d" plus the ring; both wings match so the island stays centred.
-    private let wing: CGFloat = 62
+    private let wing: CGFloat = 56
     private let iconSize: CGFloat = 18
     private let edgeInset: CGFloat = 12   // keeps content off the pill's flared edges
     private var dropHeight: CGFloat { model.expandedDropHeight }
@@ -207,16 +206,9 @@ struct IslandView: View {
                     }
                 } else {
                     HStack(spacing: 5) {
-                        HStack(alignment: .firstTextBaseline, spacing: 2) {
-                            Text(provider.primaryUsage.map(Fmt.pct) ?? "—")
-                                .font(.system(size: 12, weight: .semibold)).monospacedDigit()
-                                .foregroundStyle(.white)
-                            if let tag = pillWindowTag {
-                                Text(tag).font(.system(size: 9, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.5))
-                            }
-                        }
-                        .lineLimit(1).minimumScaleFactor(0.8)
+                        Text(provider.primaryUsage.map(Fmt.pct) ?? "—")
+                            .font(.system(size: 12, weight: .semibold)).monospacedDigit()
+                            .foregroundStyle(.white)
                         Ring(fraction: used, state: ringState(for: used), lineWidth: 3)
                             .frame(width: 14, height: 14)
                     }
@@ -237,20 +229,13 @@ struct IslandView: View {
         .padding(.horizontal, edgeInset)
     }
 
-    /// "7d" beside the pill's percent when the binding limit isn't the provider's first one, so a
-    /// weekly figure is never read as the 5-hour one. nil in the usual case: no extra chrome.
-    private var pillWindowTag: String? {
-        let s = provider
-        guard let binding = s.bindingLimit, binding.id != s.limits.first?.id else { return nil }
-        return binding.windowTag
-    }
-
-    /// "42%", or "42%, 7-Day limit" when the pill shows a window tag.
+    /// "42%", or "100%, 7-Day limit" when a used-up limit has taken over from the first one.
     private var pillSpokenValue: String {
         if let pill = provider.pill { return pill.text }
         guard let usage = provider.primaryUsage else { return "unknown" }
-        guard pillWindowTag != nil, let label = provider.bindingLimit?.label else { return Fmt.pct(usage) }
-        return "\(Fmt.pct(usage)), \(label) limit"
+        guard let binding = provider.bindingLimit, binding.id != provider.limits.first?.id
+        else { return Fmt.pct(usage) }
+        return "\(Fmt.pct(usage)), \(binding.label) limit"
     }
 
     @ViewBuilder private var providerIcon: some View {
@@ -359,10 +344,10 @@ struct IslandView: View {
 
     private static let amber = Color(red: 0.96, green: 0.70, blue: 0.20)
 
-    /// Account-wide limits first, then per-model ones; four meters is all the page holds.
+    /// Account-wide limits first, then per-model ones; three meters keep the page breathing.
     private var meterLimits: [UsageLimitMetric] {
         let limits = provider.limits
-        return Array((limits.filter { !$0.scoped } + limits.filter(\.scoped)).prefix(4))
+        return Array((limits.filter { !$0.scoped } + limits.filter(\.scoped)).prefix(3))
     }
 
     private var pageLimits: some View {
@@ -381,25 +366,21 @@ struct IslandView: View {
                     }
                     .opacity(model.isStale ? 0.55 : 1)      // dim live numbers when not fresh
                 } else {
-                    VStack(spacing: 5) {
-                        ForEach(meterLimits) { LimitMeterRow(metric: $0) }
-                        // Claude only: the 5-hour trend says the limit lands before the reset.
-                        if let eta = model.etaToLimit {
-                            Text("~\(Fmt.dur(eta)) to limit at this pace")
-                                .font(.system(size: 10, weight: .medium)).lineLimit(1)
-                                .foregroundStyle(Self.amber)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(spacing: 10) {
+                        ForEach(meterLimits) { metric in
+                            // Claude only: the 5-hour trend says the limit lands before the reset.
+                            LimitMeterRow(metric: metric,
+                                          note: metric.id == "claude-session"
+                                              ? model.etaToLimit.map { "~\(Fmt.dur($0)) to limit" } : nil)
                         }
                     }
+                    .padding(.horizontal, 14).padding(.vertical, 11)
+                    .background(Color.white.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                     .opacity(model.isStale ? 0.55 : 1)
-                    if !snapshot.stats.isEmpty {
-                        HStack(spacing: 8) {
-                            ForEach(Array(snapshot.stats.prefix(3))) { metric in
-                                tile(metric.label, metric.value, height: .compact, sub: metric.subtitle,
-                                     tint: metric.tint)
-                            }
-                        }
-                        .opacity(model.isStale ? 0.55 : 1)
+                    // A problem replaces the stats rather than squeezing in below them.
+                    if snapshot.statusMessage == nil, !model.isStale, !snapshot.stats.isEmpty {
+                        statStrip(Array(snapshot.stats.prefix(3)))
                     }
                 }
                 // A frame, not a Spacer: a Spacer would cost two stack gaps of the page's height.
@@ -408,7 +389,7 @@ struct IslandView: View {
         }
     }
 
-    /// A problem in amber when there is one; otherwise a quiet note of how fresh the numbers are.
+    /// A problem in amber when there is one, and nothing otherwise: only surface a problem, never chrome.
     @ViewBuilder private var statusLine: some View {
         let snapshot = provider
         if let message = snapshot.statusMessage {
@@ -420,17 +401,35 @@ struct IslandView: View {
             Text("reconnecting…").font(.system(size: 10))
                 .foregroundStyle(Self.amber)
                 .frame(maxWidth: .infinity, alignment: .leading)
-        } else if snapshot.fetchedAt != nil || snapshot.source != nil {
-            // Ticks on its own: between fetches nothing else re-renders the page.
-            TimelineView(.periodic(from: .now, by: 10)) { _ in
-                Text(([snapshot.fetchedAt.map { "updated \(Fmt.ago($0)) ago" }, snapshot.source]
-                      as [String?]).compactMap { $0 }.joined(separator: " · "))
-                    .font(.system(size: 9.5)).monospacedDigit()
-                    .foregroundStyle(.white.opacity(0.35))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .lineLimit(1).truncationMode(.tail)
+        }
+    }
+
+    /// Up to three figures in one quiet card: label over value, the value's note beneath.
+    private func statStrip(_ stats: [UsageStatMetric]) -> some View {
+        HStack(alignment: .top, spacing: 0) {
+            ForEach(Array(stats.enumerated()), id: \.element.id) { index, metric in
+                if index > 0 {
+                    Rectangle().fill(.white.opacity(0.08)).frame(width: 1).padding(.vertical, 2)
+                        .padding(.horizontal, 10)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(metric.label).font(.system(size: 9.5)).foregroundStyle(.white.opacity(0.5))
+                    Text(metric.value).font(.system(size: 14, weight: .semibold)).monospacedDigit()
+                        .foregroundStyle(metric.tint.map(color) ?? .white)
+                    if let sub = metric.subtitle {
+                        Text(sub).font(.system(size: 9)).monospacedDigit()
+                            .foregroundStyle(.white.opacity(0.4))
+                    }
+                }
+                .lineLimit(1).minimumScaleFactor(0.75)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, 14).padding(.vertical, 9)
+        .background(Color.white.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .opacity(model.isStale ? 0.55 : 1)
     }
 
     // Page 2 — activity, the same for every provider: the week chart (or, without a daily feed,

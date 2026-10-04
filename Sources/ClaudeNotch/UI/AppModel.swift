@@ -116,16 +116,16 @@ final class AppModel {
 
     /// How urgent the icon should look (0…1) — drives Clawd's walk speed.
     ///
-    /// The binding limit, i.e. exactly what the closed pill shows, so the icon and the pill never
-    /// disagree. Scoped limits (Claude's Fable weekly) are left out by `bindingLimit`: a maxed
-    /// per-model cap would otherwise freeze Clawd while the account still has headroom.
+    /// The fullest account-wide limit (5-hour or 7-day for Claude), so Clawd hurries for a weekly
+    /// limit too even though the pill shows the session. Per-model caps (Fable) are left out: a
+    /// maxed one would otherwise freeze Clawd while the account still has headroom.
     var iconUrgency: Double {
         // No limit to run into: peak hours, which bill double, are what quicken the icon.
         if selectedProvider == .deepseek { return deepseekSnapshot.pill?.tint == .warn ? 0.6 : 0 }
-        return sessionUsage ?? 0
+        return activeProviderSnapshot.accountUsage
     }
 
-    /// The binding limit is used up — there's nothing left to spend, so Clawd stops
+    /// An account-wide limit is used up — there's nothing left to spend, so Clawd stops
     /// walking and stands still rather than sprinting at max speed.
     var isAtLimit: Bool {
         selectedProvider == .deepseek ? deepseekSnapshot.pill?.tint == .critical : iconUrgency >= 0.999
@@ -585,9 +585,10 @@ final class AppModel {
     }
 
     /// Expanded drop-down height — fixed, since the expanded view is a fixed-size two-page pager.
-    /// Read by both the view and the window's click-zone. Sized for the fullest limits page:
-    /// four meters, two stat tiles and the status line (or three meters plus the ETA line).
-    var expandedDropHeight: CGFloat { 244 }
+    /// Read by both the view and the window's click-zone. Sized for the fullest limits page —
+    /// three two-line meters in their card plus the stats strip — and capped by the 300 pt panel
+    /// minus the tallest menu bar (38 pt).
+    var expandedDropHeight: CGFloat { 260 }
 
     /// Terminal statusline feed (fallback source for session % and context).
     private func readStatusFeed() {

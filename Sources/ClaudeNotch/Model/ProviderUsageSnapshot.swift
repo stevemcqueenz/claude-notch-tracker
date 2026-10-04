@@ -75,15 +75,6 @@ struct UsageLimitMetric: Equatable, Sendable, Identifiable {
         guard let window, window > 0, let resetsAt else { return nil }
         return min(1, max(0, 1 - resetsAt.timeIntervalSince(now) / window))
     }
-
-    /// Short tag for the closed pill, so a weekly number is never mistaken for the 5-hour one:
-    /// "5h", "7d", "mo". nil when the window length is unknown.
-    var windowTag: String? {
-        guard let window, window > 0 else { return nil }
-        if window < 86_400 { return "\(Int((window / 3600).rounded()))h" }
-        if window <= 8 * 86_400 { return "\(Int((window / 86_400).rounded()))d" }
-        return "mo"
-    }
 }
 
 /// Colour for a value that carries a state of its own rather than a usage fraction, e.g.
@@ -158,12 +149,11 @@ struct ProviderUsageSnapshot: Equatable, Sendable {
     /// reacts to a recent one.
     var spendObservedAt: Date?
 
-    /// The limit nearest to running out among the account-wide ones: what the closed pill shows
-    /// (tagged with its window, so a weekly figure is never read as the 5-hour one) and what sets
-    /// the icon's urgency. Scoped limits only lead when nothing else exists.
+    /// What the closed pill shows: the first limit (the 5-hour session), unless an account-wide
+    /// limit is used up — then that one, because it's what is blocking you. Scoped limits (one
+    /// model's cap) never take over: other models still work.
     var bindingLimit: UsageLimitMetric? {
-        let account = limits.filter { !$0.scoped && $0.usedFraction != nil }
-        return account.max { ($0.usedFraction ?? 0) < ($1.usedFraction ?? 0) } ?? limits.first
+        limits.first { !$0.scoped && ($0.usedFraction ?? 0) >= 0.999 } ?? limits.first
     }
 
     /// The headline fraction for the collapsed pill: the binding limit's value.
@@ -195,6 +185,12 @@ struct ProviderUsageSnapshot: Equatable, Sendable {
 
     var maximumUsage: Double {
         limits.compactMap(\.usedFraction).max() ?? 0
+    }
+
+    /// The fullest account-wide limit: how hard the icon works. Per-model caps are left out, so a
+    /// used-up Fable weekly doesn't freeze Clawd while the account still has headroom.
+    var accountUsage: Double {
+        limits.filter { !$0.scoped }.compactMap(\.usedFraction).max() ?? 0
     }
 
     func isStale(now: Date = Date(), after interval: TimeInterval = 150) -> Bool {

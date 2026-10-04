@@ -13,24 +13,21 @@ struct UsageLimitMetricTests {
         #expect(noWindow.elapsedFraction(now: now) == nil)
     }
 
-    @Test func windowTags() {
-        func tag(_ w: TimeInterval) -> String? {
-            UsageLimitMetric(id: "x", label: "x", usedFraction: 0, resetsAt: nil, window: w).windowTag
-        }
-        #expect(tag(5 * 3600) == "5h")
-        #expect(tag(7 * 86_400) == "7d")
-        #expect(tag(30 * 86_400) == "mo")
-    }
-
-    @Test func bindingLimitSkipsScopedLimits() {
+    @Test func pillShowsTheSessionUnlessALimitIsUsedUp() {
         var s = ProviderUsageSnapshot(provider: .claude)
         s.limits = [
             .init(id: "5h", label: "5-Hour", usedFraction: 0.10, resetsAt: nil, window: 5 * 3600.0),
             .init(id: "7d", label: "7-Day", usedFraction: 0.90, resetsAt: nil, window: 7 * 86_400.0),
             .init(id: "fable", label: "Fable", usedFraction: 1.0, resetsAt: nil, scoped: true),
         ]
+        // A full weekly is still not "used up", and a maxed per-model cap never takes over.
+        #expect(s.bindingLimit?.id == "5h")
+        #expect(s.primaryUsage == 0.10)
+        #expect(s.accountUsage == 0.90)
+
+        s.limits[1] = .init(id: "7d", label: "7-Day", usedFraction: 1.0, resetsAt: nil)
         #expect(s.bindingLimit?.id == "7d")
-        #expect(s.primaryUsage == 0.90)
+        #expect(s.primaryUsage == 1.0)
     }
 
     @Test func failedFetchKeepsLastGoodLimits() {
