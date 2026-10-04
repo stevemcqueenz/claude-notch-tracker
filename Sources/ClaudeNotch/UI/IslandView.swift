@@ -90,6 +90,7 @@ struct IslandView: View {
         .frame(width: closedWidth,
                height: expanded ? closedH + dropHeight : closedH,
                alignment: .top)
+        .compositingGroup()       // so the notch clip also holds for layers animating inside it
         .clipShape(shape)
         .contentShape(shape)
         .contextMenu { menu }
@@ -283,6 +284,9 @@ struct IslandView: View {
                 .animation(.spring(response: 0.4, dampingFraction: 0.85), value: page)
             }
             .frame(width: contentWidth, height: pagerHeight, alignment: .topLeading)
+            // Flatten before clipping: the sliding pages animate on their own layers, which can
+            // slip past a plain clip and show beside the island mid-swipe.
+            .compositingGroup()
             .clipped()
             .contentShape(Rectangle())
             .gesture(
