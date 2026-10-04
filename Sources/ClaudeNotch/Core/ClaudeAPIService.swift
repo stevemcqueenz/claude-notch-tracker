@@ -230,13 +230,13 @@ actor ClaudeAPIService {
         }
 
         // Fable has its own weekly limit (the Desktop app shows it) — a "weekly_scoped" entry in the
-        // `limits` array whose scope.model.display_name is "Fable"; its figure is `percent` (0–100).
+        // `limits` array whose scope.model.display_name starts with "Fable"; its figure is `percent` (0–100).
         var f: Double?
         var fr: Date?
         if let arr = obj["limits"] as? [[String: Any]] {
             for e in arr {
                 let model = (e["scope"] as? [String: Any])?["model"] as? [String: Any]
-                guard (model?["display_name"] as? String) == "Fable" else { continue }
+                guard (model?["display_name"] as? String)?.lowercased().hasPrefix("fable") == true else { continue }
                 if let p = (e["percent"] as? NSNumber)?.doubleValue { f = min(1, max(0, p / 100)) }
                 if let rs = e["resets_at"] as? String {
                     let iso = ISO8601DateFormatter(); iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

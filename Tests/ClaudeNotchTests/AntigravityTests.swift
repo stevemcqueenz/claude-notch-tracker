@@ -103,6 +103,16 @@ import Testing
         #expect(snapshot.limits.last?.usedFraction == 0)
     }
 
+    @Test func onlyTheLeadingGroupIsUnscopedAndWindowsAreKnown() throws {
+        let response = try AntigravityCLI.validate(Data(Self.live.utf8))
+        let snapshot = AntigravitySnapshotMapper.make(
+            quota: response, quotaError: nil, stats: .init(),
+            activeModel: "Gemini 3.7 Flash (High)", now: Date()
+        )
+        #expect(snapshot.limits.map(\.scoped) == [false, false, true, true])
+        #expect(snapshot.limits.map(\.window) == [18_000.0, 604_800.0, 18_000.0, 604_800.0] as [TimeInterval?])
+    }
+
     @Test func leadsWithTheGroupOwningTheActiveModel() throws {
         let response = try AntigravityCLI.validate(Data(Self.live.utf8))
         let snapshot = AntigravitySnapshotMapper.make(
@@ -278,6 +288,7 @@ import Testing
         #expect(stats.turnsByModel == ["gemini-3.7-flash": 2, "gemini-3.6-flash": 1])
         #expect(stats.topModel == "gemini-3.7-flash")
         #expect(stats.tokens(on: midday) == stats.totalTokens)
+        #expect(stats.turnsByDay[Calendar.current.startOfDay(for: midday)] == 3)
 
         let conversation = try #require(stats.conversations.first)
         #expect(conversation.workspace == "portfolio-website")
@@ -322,6 +333,26 @@ import Testing
         // A deleted store leaves the totals rather than lingering in the cache.
         try FileManager.default.removeItem(at: store)
         #expect(reader.scan().isEmpty)
+    }
+
+    /// A negative int64 reads back as a UInt64 above Int.max; Int(_:) trapped on it.
+    @Test func skipsARowWhoseVarintDoesNotFitAnInt() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("antigravity-store-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let negative = PB.message(field: 1, payload: PB.message(
+            field: 4, payload: PB.varint(field: 2, value: UInt64.max)))
+        try FixtureStore.write(to: directory.appendingPathComponent("negative.db"),
+                               workspace: nil, turns: [
+            .init(input: 100, output: 10, thinking: 4, model: "gemini-3.7-flash",
+                  at: Date(timeIntervalSince1970: 1_786_707_127)),
+        ], extraBlobs: [negative])
+
+        let stats = FixtureStore.scan(directory: directory)
+        #expect(stats.totalTurns == 1)
+        #expect(stats.totalTokens == 110)
     }
 
     @Test func ignoresRowsThatDoNotDecode() throws {

@@ -10,6 +10,8 @@ import SQLite3
 struct AntigravityLocalStats: Sendable, Equatable {
     /// startOfDay → input + output tokens.
     var tokensByDay: [Date: Int] = [:]
+    /// startOfDay → turns, for turns that carry a start time.
+    var turnsByDay: [Date: Int] = [:]
     var totalTokens = 0
     var totalTurns = 0
     var thinkingTokens = 0
@@ -162,9 +164,10 @@ final class AntigravityLocalStore: @unchecked Sendable {
             guard let record = ProtobufMessage(blob).message(Field.record),
                   let usage = record.message(Field.Record.usage) else { return }
 
-            let input = Int(usage.varint(Field.Usage.input) ?? 0)
-            let output = Int(usage.varint(Field.Usage.output) ?? 0)
-            let thinking = Int(usage.varint(Field.Usage.thinking) ?? 0)
+            // A negative int64 arrives as a huge UInt64; Int(_:) would trap on it. Skip the row.
+            guard let input = Int(exactly: usage.varint(Field.Usage.input) ?? 0),
+                  let output = Int(exactly: usage.varint(Field.Usage.output) ?? 0),
+                  let thinking = Int(exactly: usage.varint(Field.Usage.thinking) ?? 0) else { return }
             guard input >= 0, output >= 0,
                   input < maximumPlausibleTokens, output < maximumPlausibleTokens else { return }
 
@@ -181,7 +184,9 @@ final class AntigravityLocalStore: @unchecked Sendable {
                 .message(Field.Timing.startedAt)?
                 .varint(Field.Timestamp.seconds), seconds > 0 {
                 let date = Date(timeIntervalSince1970: TimeInterval(seconds))
-                stats.tokensByDay[calendar.startOfDay(for: date), default: 0] += total
+                let day = calendar.startOfDay(for: date)
+                stats.tokensByDay[day, default: 0] += total
+                stats.turnsByDay[day, default: 0] += 1
                 if date > last { last = date }
             }
         }
@@ -258,6 +263,7 @@ private extension AntigravityLocalStats {
         totalTurns += other.totalTurns
         thinkingTokens += other.thinkingTokens
         tokensByDay.merge(other.tokensByDay, uniquingKeysWith: +)
+        turnsByDay.merge(other.turnsByDay, uniquingKeysWith: +)
         turnsByModel.merge(other.turnsByModel, uniquingKeysWith: +)
         conversations.append(contentsOf: other.conversations)
     }

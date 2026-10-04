@@ -339,7 +339,10 @@ enum AntigravitySnapshotMapper {
                     id: bucket.id ?? "antigravity-\(index)-\(position)",
                     label: usesPrefix ? "\(prefix) · \(window)" : window,
                     usedFraction: 1 - remaining,
-                    resetsAt: bucket.resetTime.flatMap(date(fromISO8601:))
+                    resetsAt: bucket.resetTime.flatMap(date(fromISO8601:)),
+                    window: windowLength(bucket.window),
+                    // Only the leading group (the active model's) speaks for the pill.
+                    scoped: index > 0
                 )
             }
         }
@@ -365,6 +368,16 @@ enum AntigravitySnapshotMapper {
         }
     }
 
+    private static func windowLength(_ window: String?) -> TimeInterval? {
+        switch window?.lowercased() {
+        case "5h": 5 * 3600
+        case "daily": 86_400
+        case "weekly": 7 * 86_400
+        case "monthly": 30 * 86_400
+        default: nil
+        }
+    }
+
     private static func windowLabel(_ window: String?, fallback: String?) -> String {
         switch window?.lowercased() {
         case "5h": "5-Hour"
@@ -385,10 +398,7 @@ enum AntigravitySnapshotMapper {
     // MARK: local stats
 
     private static func turnsToday(_ stats: AntigravityLocalStats, now: Date) -> Int? {
-        let start = Calendar.current.startOfDay(for: now)
-        let turns = stats.conversations
-            .filter { $0.last >= start }
-            .reduce(0) { $0 + $1.turns }
+        let turns = stats.turnsByDay[Calendar.current.startOfDay(for: now)] ?? 0
         return turns > 0 ? turns : nil
     }
 

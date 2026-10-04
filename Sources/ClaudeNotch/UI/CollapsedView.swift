@@ -32,22 +32,29 @@ enum Fmt {
     }
     static func tokens(_ n: Int) -> String {
         switch n {
+        case 1_000_000_000...: return String(format: "%.1fB", Double(n) / 1_000_000_000)
         case 1_000_000...: return String(format: "%.1fM", Double(n) / 1_000_000)
         case 1_000...:     return String(format: "%.0fK", Double(n) / 1_000)
         default:           return "\(n)"
         }
     }
-    static func usd(_ v: Double) -> String { String(format: "$%.2f", v) }
+    /// "11,592.36": thousands separators, always en_US so the figure reads the same everywhere.
+    private static func grouped(_ v: Double) -> String {
+        v.formatted(.number.locale(Locale(identifier: "en_US")).precision(.fractionLength(2)))
+    }
+    static func usd(_ v: Double) -> String { "$" + grouped(v) }
 
     /// Money in a snapshot's own currency; nil is USD, which is what every pre-DeepSeek figure is.
     static func money(_ v: Double, currency: String?) -> String {
         guard let currency, currency != "USD" else { return usd(v) }
-        return symbol(currency) + String(format: "%.2f", v)
+        return symbol(currency) + grouped(v)
     }
 
-    /// Fits the closed pill's wing: whole units from 100 up, one decimal place below that.
+    /// Fits the closed pill's wing: "12.4K" from a thousand up, whole units from 100, one decimal
+    /// place below that.
     static func compactMoney(_ v: Double, currency: String?) -> String {
         let s = symbol(currency ?? "USD")
+        if v >= 1_000 { return s + String(format: "%.1fK", v / 1_000) }
         if v >= 100 { return s + String(Int(v.rounded())) }
         return s + String(format: "%.1f", v)
     }

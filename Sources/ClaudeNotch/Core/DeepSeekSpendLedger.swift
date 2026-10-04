@@ -3,8 +3,11 @@ import Foundation
 /// DeepSeek's API reports a balance and nothing about spend, so spend is what the balance is seen
 /// to lose between readings. A rise is a top-up (or a grant) and is recorded on its own, never
 /// netted against spend. Everything here is observed rather than estimated, and labelled so: a
-/// stretch the app wasn't running lands on the day of the next reading, and a top-up and a spend
-/// that fall between the same two readings partly cancel.
+/// top-up and a spend that fall between the same two readings partly cancel.
+///
+/// The balance is only polled while DeepSeek is on screen, so two readings can be days apart. A
+/// drop whose previous reading was on an earlier calendar day is booked on that earlier day, never
+/// on the day it was noticed: "spent today" must not swallow a whole weekend.
 struct DeepSeekSpendLedger: Codable, Equatable, Sendable {
     struct TopUp: Codable, Equatable, Sendable {
         let date: Date
@@ -21,6 +24,9 @@ struct DeepSeekSpendLedger: Codable, Equatable, Sendable {
     /// The last reading that found the balance lower — what makes the whale spout. Optional, so
     /// a ledger saved before it existed still decodes.
     private(set) var lastSpendAt: Date?
+    /// When `lastBalance` was read. Optional so an older saved ledger still decodes (and, lacking
+    /// it, books a drop on the day it is seen, as before).
+    private(set) var lastReadingAt: Date?
 
     static let keptDays = 35
     static let keptTopUps = 10
@@ -37,20 +43,28 @@ struct DeepSeekSpendLedger: Codable, Equatable, Sendable {
             spentByDay = [:]
             topUps = []
             lastSpendAt = nil
+            lastReadingAt = date
             return
         }
         if trackingSince == nil { trackingSince = date }
         if let last = lastBalance {
             let delta = last - balance
             if delta > Self.epsilon {
-                spentByDay[Self.dayKey(date, calendar), default: 0] += delta
-                lastSpendAt = date
+                // After a gap the drop happened sometime since the previous reading; the earlier
+                // day is the honest place for it, and it is not a "just now" spend either.
+                if let previous = lastReadingAt, !calendar.isDate(previous, inSameDayAs: date) {
+                    spentByDay[Self.dayKey(previous, calendar), default: 0] += delta
+                } else {
+                    spentByDay[Self.dayKey(date, calendar), default: 0] += delta
+                    lastSpendAt = date
+                }
             } else if delta < -Self.epsilon {
                 topUps.append(TopUp(date: date, amount: -delta))
                 topUps = Array(topUps.suffix(Self.keptTopUps))
             }
         }
         lastBalance = balance
+        lastReadingAt = date
         prune(before: date, calendar: calendar)
     }
 

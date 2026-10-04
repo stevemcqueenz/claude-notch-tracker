@@ -134,11 +134,14 @@ enum OpencodeGoLocalUsage {
             provider: .opencodeGo,
             limits: [
                 UsageLimitMetric(id: "opencode-session", label: "5-Hour",
-                                 usedFraction: w.session.usedFraction, resetsAt: w.session.resetsAt),
+                                 usedFraction: w.session.usedFraction, resetsAt: w.session.resetsAt,
+                                 window: 5 * 3600),
                 UsageLimitMetric(id: "opencode-weekly", label: "7-Day",
-                                 usedFraction: w.weekly.usedFraction, resetsAt: w.weekly.resetsAt),
+                                 usedFraction: w.weekly.usedFraction, resetsAt: w.weekly.resetsAt,
+                                 window: 7 * 86_400),
                 UsageLimitMetric(id: "opencode-monthly", label: "Monthly",
-                                 usedFraction: w.monthly.usedFraction, resetsAt: w.monthly.resetsAt),
+                                 usedFraction: w.monthly.usedFraction, resetsAt: w.monthly.resetsAt,
+                                 window: 30 * 86_400),
             ],
             stats: stats,
             todayCost: todayCost,
@@ -146,7 +149,7 @@ enum OpencodeGoLocalUsage {
             dailySeries: dailySeries(rows: rows, now: now),
             chartTitle: "last 7 days · local",
             sessions: sessions(rows: rows),
-            source: "local",
+            source: "local estimate",
             fetchedAt: now
         )
     }

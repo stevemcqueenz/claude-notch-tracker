@@ -14,6 +14,8 @@ actor DeepSeekUsageProvider {
     private var lastFetchedAt: Date?
     /// Read once: a Keychain read per poll would be a prompt per poll on an ad-hoc build.
     private var cachedKey: String?
+    /// Set by a 401: the Keychain is not re-read (a prompt per poll) until the key is changed.
+    private var keyRejected = false
 
     init() {
         ledger = UserDefaults.standard.data(forKey: Self.ledgerKey)
@@ -21,12 +23,21 @@ actor DeepSeekUsageProvider {
             ?? DeepSeekSpendLedger()
     }
 
-    /// Forget the cached key after the user sets or removes one.
-    func resetCredentials() { cachedKey = nil }
+    /// The user set or removed the key. A different key may be a different account, so its
+    /// balance must not be read as a top-up or a spend of the old one: forget the last balance
+    /// and the ledger along with the key.
+    func resetCredentials() {
+        cachedKey = nil
+        keyRejected = false
+        lastBalance = nil
+        lastFetchedAt = nil
+        ledger = DeepSeekSpendLedger()
+        UserDefaults.standard.removeObject(forKey: Self.ledgerKey)
+    }
 
     func fetch(now: Date = Date()) async -> ProviderUsageSnapshot {
-        if cachedKey == nil { cachedKey = DeepSeekCredentials.read() }
-        guard let key = cachedKey else {
+        if cachedKey == nil, !keyRejected { cachedKey = DeepSeekCredentials.read() }
+        guard cachedKey != nil || keyRejected else {
             return .unavailable(.deepseek, message: UsageProviderID.deepseek.setupHint)
         }
         // Holiday dates only matter with a key: without one this would ping jsDelivr on
@@ -36,6 +47,7 @@ actor DeepSeekUsageProvider {
 
         var message: String?
         do {
+            guard let key = cachedKey else { throw DeepSeekBalance.Failure.unauthorized }
             let balance = try await Self.requestBalance(key: key)
             lastBalance = balance
             lastFetchedAt = now
@@ -45,6 +57,7 @@ actor DeepSeekUsageProvider {
             }
         } catch DeepSeekBalance.Failure.unauthorized {
             cachedKey = nil
+            keyRejected = true
             message = "DeepSeek rejected the API key"
         } catch {
             // Static text on purpose: surfacing raw network errors would pipe any future

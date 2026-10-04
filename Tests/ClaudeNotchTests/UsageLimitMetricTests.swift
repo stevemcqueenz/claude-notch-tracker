@@ -7,7 +7,7 @@ struct UsageLimitMetricTests {
 
     @Test func elapsedFractionComesFromWindowAndReset() {
         let m = UsageLimitMetric(id: "s", label: "5-Hour", usedFraction: 0.4,
-                                 resetsAt: now.addingTimeInterval(2 * 3600), window: 5 * 3600)
+                                 resetsAt: now.addingTimeInterval(2 * 3600), window: 5 * 3600.0)
         #expect(abs((m.elapsedFraction(now: now) ?? -1) - 0.6) < 1e-9)
         let noWindow = UsageLimitMetric(id: "s", label: "5-Hour", usedFraction: 0.4, resetsAt: now)
         #expect(noWindow.elapsedFraction(now: now) == nil)
@@ -25,8 +25,8 @@ struct UsageLimitMetricTests {
     @Test func bindingLimitSkipsScopedLimits() {
         var s = ProviderUsageSnapshot(provider: .claude)
         s.limits = [
-            .init(id: "5h", label: "5-Hour", usedFraction: 0.10, resetsAt: nil, window: 5 * 3600),
-            .init(id: "7d", label: "7-Day", usedFraction: 0.90, resetsAt: nil, window: 7 * 86_400),
+            .init(id: "5h", label: "5-Hour", usedFraction: 0.10, resetsAt: nil, window: 5 * 3600.0),
+            .init(id: "7d", label: "7-Day", usedFraction: 0.90, resetsAt: nil, window: 7 * 86_400.0),
             .init(id: "fable", label: "Fable", usedFraction: 1.0, resetsAt: nil, scoped: true),
         ]
         #expect(s.bindingLimit?.id == "7d")

@@ -73,7 +73,7 @@ import Testing
         let snapshot = OpencodeGoLocalUsage.snapshot(rows: rows, now: now)
 
         #expect(snapshot.provider == .opencodeGo)
-        #expect(snapshot.source == "local")
+        #expect(snapshot.source == "local estimate")
         #expect(snapshot.limits.map(\.label) == ["5-Hour", "7-Day", "Monthly"])
         #expect(snapshot.limits.first?.usedFraction == 0.5)
         #expect(snapshot.dailySeries.count == 7)

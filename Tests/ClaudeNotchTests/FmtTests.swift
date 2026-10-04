@@ -19,4 +19,24 @@ import Foundation
     @Test func pastDatesClampToZero() {
         #expect(Fmt.until(Date().addingTimeInterval(-500)) == "0m")
     }
+
+    @Test func moneyHasThousandsSeparators() {
+        #expect(Fmt.usd(11_592.36) == "$11,592.36")
+        #expect(Fmt.usd(3) == "$3.00")
+        #expect(Fmt.money(1_234.5, currency: "CNY") == "¥1,234.50")
+        #expect(Fmt.money(1_234.5, currency: nil) == "$1,234.50")
+    }
+
+    @Test func compactMoneyStaysShort() {
+        #expect(Fmt.compactMoney(12_400, currency: "USD") == "$12.4K")
+        #expect(Fmt.compactMoney(250, currency: "CNY") == "¥250")
+        #expect(Fmt.compactMoney(4.25, currency: nil) == "$4.2" || Fmt.compactMoney(4.25, currency: nil) == "$4.3")
+    }
+
+    @Test func tokensScaleToBillions() {
+        #expect(Fmt.tokens(5_400_000_000) == "5.4B")
+        #expect(Fmt.tokens(2_500_000) == "2.5M")
+        #expect(Fmt.tokens(42_000) == "42K")
+        #expect(Fmt.tokens(999) == "999")
+    }
 }

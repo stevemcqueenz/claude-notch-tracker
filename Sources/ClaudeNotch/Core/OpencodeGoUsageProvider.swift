@@ -9,9 +9,11 @@ import Foundation
 actor OpencodeGoUsageProvider {
     private static let queue = DispatchQueue(label: "opencode-go-usage", qos: .utility)
     private let api = OpencodeGoAPI()
-    /// The last snapshot that actually carried numbers. Returned untouched (its old `fetchedAt`
-    /// dims it via the UI's stale check) when a web round trip fails, so a blip never blanks it.
+    /// The last snapshot that carried numbers. Returned (its old `fetchedAt` dims it via the UI's
+    /// stale check) for a short while when the server round trip fails, so a blip never blanks
+    /// it; past `serverGrace` the card goes back to re-reading local history on every poll.
     private var lastGood: ProviderUsageSnapshot?
+    private static let serverGrace: TimeInterval = 3600
 
     func fetch(now: Date = Date()) async -> ProviderUsageSnapshot {
         switch await api.fetch(now: now) {
@@ -22,15 +24,24 @@ actor OpencodeGoUsageProvider {
             lastGood = snapshot
             return snapshot
         case .failed:
-            // A web session existed but the round trip didn't parse or connect: keep the last good
-            // numbers rather than replacing them with account-agnostic local estimates.
-            if let lastGood { return lastGood }
+            // We had a credential but the round trip didn't parse or connect. Keep the last
+            // server reading while it is fresh enough; otherwise local history, re-read each poll.
+            if let lastGood, lastGood.source != Self.localSource,
+               let fetchedAt = lastGood.fetchedAt, now.timeIntervalSince(fetchedAt) < Self.serverGrace {
+                return lastGood
+            }
             return await resolveLocal(now: now)
+        case .keyRejected:
+            var snapshot = await resolveLocal(now: now)
+            snapshot.statusMessage = "opencode API key rejected"
+            return snapshot
         case .unavailable:
-            // Nothing web-signed-in to try: local history is the intended fallback, then last good.
+            // Nothing web-signed-in to try: local history is the intended fallback.
             return await resolveLocal(now: now)
         }
     }
+
+    private static let localSource = "local estimate"
 
     private enum Local: Sendable {
         case snapshot(ProviderUsageSnapshot)

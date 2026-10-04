@@ -23,6 +23,9 @@ enum OpencodeGoWebFetch: Sendable {
     case usage(ProviderUsageSnapshot)
     case unavailable
     case failed
+    /// `OPENCODE_API_KEY` is set and the server refused it (401/403), and no browser session
+    /// stood in for it.
+    case keyRejected
 }
 
 /// opencode-go's server meters.
@@ -62,11 +65,20 @@ actor OpencodeGoAPI {
     /// The best snapshot the web can offer this cycle: API key first, then the browser console.
     func fetch(now: Date = Date(),
                environment: [String: String] = ProcessInfo.processInfo.environment) async -> OpencodeGoWebFetch {
-        if let key = Self.apiKey(environment: environment),
-           let snapshot = try? await Self.fetchAPIUsage(apiKey: key, now: now) {
-            return .usage(snapshot)
+        var apiOutcome: OpencodeGoWebFetch?
+        if let key = Self.apiKey(environment: environment) {
+            do {
+                return .usage(try await Self.fetchAPIUsage(apiKey: key, now: now))
+            } catch OpencodeGoAPIError.invalidCredentials {
+                apiOutcome = .keyRejected
+            } catch {
+                apiOutcome = .failed   // transient: the provider keeps the last good reading
+            }
         }
-        return await fetchWeb(now: now)
+        let web = await fetchWeb(now: now)
+        // A browser session beats a failed key; otherwise report why the key didn't work.
+        if case .usage = web { return web }
+        return apiOutcome ?? web
     }
 
     // MARK: - browser console
@@ -261,7 +273,7 @@ actor OpencodeGoAPI {
             weekly: (meters["week"] ?? meters["weekly"]) as? [String: Any],
             monthly: month,
             renewsAt: endsAt,
-            source: "web",
+            source: "opencode.ai",
             now: now)
     }
 
@@ -281,7 +293,7 @@ actor OpencodeGoAPI {
             weekly: usage["weekly"] as? [String: Any],
             monthly: usage["monthly"] as? [String: Any],
             renewsAt: renewsAt,
-            source: "api",
+            source: "API",
             now: now)
     }
 
@@ -311,15 +323,15 @@ actor OpencodeGoAPI {
                 UsageLimitMetric(id: "opencode-session", label: "5-Hour",
                                  usedFraction: fraction(sessionMeter.percent),
                                  resetsAt: resetDate(from: session, now: now),
-                                 subtitle: spendSubtitle(sessionMeter)),
+                                 subtitle: spendSubtitle(sessionMeter), window: 5 * 3600),
                 UsageLimitMetric(id: "opencode-weekly", label: "7-Day",
                                  usedFraction: fraction(weeklyMeter.percent),
                                  resetsAt: resetDate(from: weekly, now: now),
-                                 subtitle: spendSubtitle(weeklyMeter)),
+                                 subtitle: spendSubtitle(weeklyMeter), window: 7 * 86_400),
                 UsageLimitMetric(id: "opencode-monthly", label: "Monthly",
                                  usedFraction: fraction(monthlyMeter.percent),
                                  resetsAt: resetDate(from: monthly, now: now),
-                                 subtitle: spendSubtitle(monthlyMeter)),
+                                 subtitle: spendSubtitle(monthlyMeter), window: 30 * 86_400),
             ],
             stats: stats,
             renewsAt: renewsAt,

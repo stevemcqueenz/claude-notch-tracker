@@ -148,14 +148,31 @@ private let holidays = ChineseHolidayCalendar.empty.merging(holidayCNJSON: holid
         #expect(ledger.topUps.map(\.amount) == [50])
     }
 
-    @Test func spendLandsOnTheDayItWasSeen() {
+    @Test func spendSeenOnTheSameDayLandsOnThatDay() {
         var ledger = DeepSeekSpendLedger()
-        ledger.record(balance: 10, currency: "CNY", at: utc("2026-09-13T15:00:00Z"), calendar: calendar)
-        ledger.record(balance: 9, currency: "CNY", at: utc("2026-09-14T01:00:00Z"), calendar: calendar)
+        ledger.record(balance: 10, currency: "CNY", at: utc("2026-09-14T01:00:00Z"), calendar: calendar)
+        ledger.record(balance: 9, currency: "CNY", at: utc("2026-09-14T02:00:00Z"), calendar: calendar)
         let week = ledger.lastDays(7, endingAt: utc("2026-09-14T02:00:00Z"), calendar: calendar)
         #expect(week.count == 7)
         #expect(week.last?.spent == 1)
         #expect(week.dropLast().allSatisfy { $0.spent == 0 })
+        #expect(ledger.lastSpendAt == utc("2026-09-14T02:00:00Z"))
+    }
+
+    /// The balance is only polled while DeepSeek is on screen: a drop seen after a gap belongs to
+    /// the day of the previous reading, not to the day it was noticed.
+    @Test func aDropAfterAGapIsNotBookedAsSpentToday() {
+        var ledger = DeepSeekSpendLedger()
+        // 23:00 on the 13th local (+8), then 09:00 on the 14th local.
+        ledger.record(balance: 10, currency: "CNY", at: utc("2026-09-13T15:00:00Z"), calendar: calendar)
+        ledger.record(balance: 9, currency: "CNY", at: utc("2026-09-14T01:00:00Z"), calendar: calendar)
+        let week = ledger.lastDays(7, endingAt: utc("2026-09-14T02:00:00Z"), calendar: calendar)
+        #expect(week.last?.spent == 0)
+        #expect(ledger.spent(on: utc("2026-09-13T15:00:00Z"), calendar: calendar) == 1)
+        #expect(ledger.totalSpent == 1)
+        // Further drops on the same day as the new reading count today again.
+        ledger.record(balance: 8, currency: "CNY", at: utc("2026-09-14T02:00:00Z"), calendar: calendar)
+        #expect(ledger.spent(on: utc("2026-09-14T02:00:00Z"), calendar: calendar) == 1)
     }
 
     @Test func aDifferentWalletStartsOver() {
@@ -240,6 +257,6 @@ private let holidays = ChineseHolidayCalendar.empty.merging(holidayCNJSON: holid
         #expect(Fmt.money(3.5, currency: nil) == "$3.50")
         #expect(Fmt.money(3.5, currency: "CNY") == "¥3.50")
         #expect(Fmt.compactMoney(42.14, currency: "CNY") == "¥42.1")
-        #expect(Fmt.compactMoney(1234.5, currency: "CNY") == "¥1235")
+        #expect(Fmt.compactMoney(1234.5, currency: "CNY") == "¥1.2K")
     }
 }

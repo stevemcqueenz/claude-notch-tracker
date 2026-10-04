@@ -110,6 +110,33 @@ import Testing
         #expect(snapshot.limits.map(\.label) ==
             ["Codex · 5-Hour", "Codex · 7-Day", "Codex Mini · 5-Hour"])
         #expect(snapshot.limits.map(\.usedFraction) == [0.42, 0.70, 0.05])
+        #expect(snapshot.limits.map(\.scoped) == [false, false, true])
+        #expect(snapshot.limits.map(\.window) == [18_000.0, 604_800.0, 299 * 60.0] as [TimeInterval?])
+    }
+
+    @Test func nullTopLevelIdDoesNotDuplicateTheCodexBucketAndZeroWindowIsUnknown() throws {
+        let rateLimits = try decode(CodexRateLimitsResponse.self, json: """
+        {
+          "rateLimits": {
+            "primary": {"usedPercent": 10, "windowDurationMins": 300, "resetsAt": 1784556000},
+            "secondary": {"usedPercent": 20, "windowDurationMins": 0, "resetsAt": 1785160800}
+          },
+          "rateLimitsByLimitId": {
+            "codex": {
+              "limitId": "codex",
+              "primary": {"usedPercent": 10, "windowDurationMins": 300, "resetsAt": 1784556000}
+            }
+          }
+        }
+        """)
+
+        let snapshot = CodexSnapshotMapper.make(
+            account: nil, rateLimits: rateLimits, usage: nil, threads: nil, now: Date()
+        )
+
+        #expect(Set(snapshot.limits.map(\.id)).count == snapshot.limits.count)
+        #expect(snapshot.limits.map(\.label) == ["5-Hour", "Limit"])
+        #expect(snapshot.limits.last?.window == nil)
     }
 
     @Test func ordersShortCodexWindowBeforeWeeklyWhenServerSwapsPrimaryAndSecondary() throws {

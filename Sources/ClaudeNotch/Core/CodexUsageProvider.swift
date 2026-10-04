@@ -212,21 +212,25 @@ enum CodexSnapshotMapper {
         // dropped the top-level snapshot whenever the map existed, which would lose windows the
         // map doesn't repeat.
         let primary = response.rateLimits
-        let primaryID = primary.limitId
-        var buckets: [(String, CodexRateLimitsResponse.Snapshot)] = [(primaryID ?? "codex", primary)]
+        // A null top-level limitId is the "codex" bucket, so a "codex" map entry duplicates it too
+        // (duplicate ids would break SwiftUI's ForEach).
+        let primaryKey = primary.limitId ?? "codex"
+        var buckets: [(String, CodexRateLimitsResponse.Snapshot)] = [(primaryKey, primary)]
         for (key, snapshot) in (response.rateLimitsByLimitId ?? [:]).sorted(by: { $0.key < $1.key }) {
-            let duplicatesPrimary = primaryID.map { $0 == key || $0 == snapshot.limitId } ?? false
+            let duplicatesPrimary = primaryKey == key || primaryKey == snapshot.limitId
             if !duplicatesPrimary { buckets.append((key, snapshot)) }
         }
 
         let usesBucketPrefix = buckets.count > 1
-        return buckets.flatMap { key, snapshot in
+        return buckets.enumerated().flatMap { index, entry in
+            let (key, snapshot) = entry
             let bucketName = snapshot.limitName ?? snapshot.limitId ?? key
             return makeLimits(
                 prefix: key,
                 snapshot: snapshot,
                 bucketName: bucketName,
-                usesBucketPrefix: usesBucketPrefix
+                usesBucketPrefix: usesBucketPrefix,
+                scoped: index > 0   // per-model buckets never lead the pill
             )
         }
     }
@@ -235,17 +239,20 @@ enum CodexSnapshotMapper {
         prefix: String,
         snapshot: CodexRateLimitsResponse.Snapshot,
         bucketName: String,
-        usesBucketPrefix: Bool
+        usesBucketPrefix: Bool,
+        scoped: Bool
     ) -> [UsageLimitMetric] {
         let raw = [
             (sourceOrder: 0, metric: makeLimit(prefix: prefix, kind: "primary",
                                                window: snapshot.primary,
                                                bucketName: bucketName,
-                                               usesBucketPrefix: usesBucketPrefix)),
+                                               usesBucketPrefix: usesBucketPrefix,
+                                               scoped: scoped)),
             (sourceOrder: 1, metric: makeLimit(prefix: prefix, kind: "secondary",
                                                window: snapshot.secondary,
                                                bucketName: bucketName,
-                                               usesBucketPrefix: usesBucketPrefix)),
+                                               usesBucketPrefix: usesBucketPrefix,
+                                               scoped: scoped)),
         ].compactMap { entry in
             entry.metric.map { (sourceOrder: entry.sourceOrder, metric: $0) }
         }
@@ -263,7 +270,8 @@ enum CodexSnapshotMapper {
         kind: String,
         window: CodexRateLimitsResponse.Window?,
         bucketName: String,
-        usesBucketPrefix: Bool
+        usesBucketPrefix: Bool,
+        scoped: Bool
     ) -> UsageLimitMetric? {
         guard let window else { return nil }
         let duration = durationLabel(window.windowDurationMins)
@@ -272,7 +280,9 @@ enum CodexSnapshotMapper {
             id: "\(prefix)-\(kind)",
             label: label,
             usedFraction: Double(window.usedPercent) / 100,
-            resetsAt: window.resetsAt.map { Date(timeIntervalSince1970: TimeInterval($0)) }
+            resetsAt: window.resetsAt.map { Date(timeIntervalSince1970: TimeInterval($0)) },
+            window: window.windowDurationMins.flatMap { $0 > 0 ? TimeInterval($0) * 60 : nil },
+            scoped: scoped
         )
     }
 
@@ -290,7 +300,7 @@ enum CodexSnapshotMapper {
     }
 
     private static func durationLabel(_ minutes: Int?) -> String {
-        guard let minutes else { return "Limit" }
+        guard let minutes, minutes > 0 else { return "Limit" }
         // Official Codex matches window durations within ±5% of the canonical windows
         // (tui/src/chatwidget/rate_limits.rs, is_approximate_window), so a 299-minute window
         // still reads as the 5-hour limit instead of "299-Min".

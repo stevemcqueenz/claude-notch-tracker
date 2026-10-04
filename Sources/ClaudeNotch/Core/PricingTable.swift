@@ -1,6 +1,6 @@
 import Foundation
 
-/// USD per 1M tokens, from Anthropic's published API list prices (checked 2026-09-07).
+/// USD per 1M tokens, from Anthropic's published API list prices (checked 2026-10-04).
 ///
 /// A Claude subscription doesn't bill per token, so this values logged usage at list price —
 /// "what this would have cost on the API" — which is the only meaningful number to show.
@@ -37,6 +37,7 @@ enum PricingTable {
         ("opus-4-6",   Rate(input: 5,  output: 25)),
         ("opus-4-7",   Rate(input: 5,  output: 25)),
         ("opus-4-8",   Rate(input: 5,  output: 25)),
+        ("opus-5-5",   Rate(input: 4,  output: 20, cacheReadMultiplier: 0.05)),
         ("opus-5",     Rate(input: 5,  output: 25)),
         ("opus",       Rate(input: 15, output: 75)),   // 4.5 and earlier
         ("sonnet-5",   Rate(input: 2,  output: 10)),

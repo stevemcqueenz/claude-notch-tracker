@@ -24,7 +24,9 @@ import Foundation
         ("claude-opus-4-1", 90.0),         // legacy Opus really is $15/$75
         ("claude-fable-5", 60.0),          // $10 + $50
         ("claude-fable-5-1", 60.0),
+        ("claude-opus-5-5", 24.0),         // $4 + $20, not Opus 5's $5/$25
         ("claude-sonnet-5", 12.0),         // $2 + $10
+        ("claude-sonnet-5-5", 12.0),       // $2 + $10
         ("claude-sonnet-4-6", 18.0),       // $3 + $15
         ("claude-haiku-4-5-20251001", 6.0) // $1 + $5, dated id still matches
     ])
@@ -42,6 +44,13 @@ import Foundation
     /// Regression: a bare "opus" substring priced every current Opus at the retired $15/$75.
     @Test func currentOpusIsNotPricedAsLegacyOpus() {
         #expect(cost("claude-opus-5") < cost("claude-opus-4-1"))
+    }
+
+    /// Opus 5.5 is $4/$20 with cache reads at $0.20; Sonnet 5.5 reads at $0.20 too.
+    @Test func opus55HasItsOwnRate() {
+        #expect(abs(cost("claude-opus-5-5", input: 0, output: 0, read: 1_000_000) - 0.20) < 0.0001)
+        #expect(abs(cost("claude-opus-5-5", input: 0, output: 0, write: 1_000_000) - 5.0) < 0.0001)
+        #expect(abs(cost("claude-sonnet-5-5", input: 0, output: 0, read: 1_000_000) - 0.20) < 0.0001)
     }
 
     /// Cache writes cost 1.25x input for the 5-minute cache and 2x for the 1-hour one.
@@ -72,8 +81,8 @@ import Foundation
     /// The fallback exists only for models released after this table was written. Everything we
     /// actually see in real logs must match a deliberate entry — that's what Fable failed to do.
     @Test func everyModelSeenInTheWildMatchesAnEntry() {
-        let seen = ["claude-opus-4-8", "claude-opus-5", "claude-fable-5", "claude-fable-5-1",
-                    "claude-sonnet-4-6", "claude-sonnet-5", "claude-haiku-4-5-20251001"]
+        let seen = ["claude-opus-4-8", "claude-opus-5", "claude-opus-5-5", "claude-fable-5", "claude-fable-5-1",
+                    "claude-sonnet-4-6", "claude-sonnet-5", "claude-sonnet-5-5", "claude-haiku-4-5-20251001"]
         for model in seen {
             #expect(PricingTable.rates.contains { model.contains($0.match) },
                     "\(model) falls through to the fallback rate")

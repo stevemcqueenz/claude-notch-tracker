@@ -1,6 +1,6 @@
 # Provider Architecture
 
-Claude Notch supports Claude, Codex and Antigravity through a shared `ProviderUsageSnapshot`
+Claude Notch supports Claude, Codex, Antigravity, DeepSeek and opencode-go through a shared `ProviderUsageSnapshot`
 model. The UI only renders normalized limits, statistics, recent activity, plan metadata, and
 status information; each provider owns its data acquisition and mapping logic.
 
@@ -46,10 +46,18 @@ opencode-go reads the server's own meters first, with local history as the fallb
   `endsAt` renewals) and `GET /console/api/billing/status` (prepaid Zen balance). With
   `OPENCODE_API_KEY` set, `GET /zen/go/v1/usage` is used instead. The provider is offered once
   `~/.local/share/opencode/auth.json` carries a key or `opencode.db` history exists (file
-  checks only, never the Keychain); a failed round trip keeps the last good reading.
+  checks only, never the Keychain). A failed round trip keeps the last server reading for up to
+  an hour (dimmed by its age); after that, or when no browser session or key works at all
+  (offline-at-launch, 403, no subscription), the card re-reads local history on every poll. With
+  `OPENCODE_API_KEY` set, a transient API error keeps the last API reading, and a 401 shows
+  "opencode API key rejected".
 - **Local.** `~/.local/share/opencode/opencode.db` (`session_message`, falling back to the older
   `message`/`part` tables) is read for per-turn costs, bucketed into rolling 5-hour, UTC-week
-  and calendar-month windows. Like the Claude logs, this is labelled `local`.
+  and calendar-month windows. Plan limits are hardcoded, so these are estimates.
+
+The snapshot's source label says where the numbers came from: `opencode.ai` (browser session),
+`API` (`OPENCODE_API_KEY`) or `local estimate` (local history). The 7-day chart is always built
+from local spend (the server payload has no daily buckets), so its title says `· local`.
 
 ## Antigravity
 
@@ -121,9 +129,9 @@ Claude is always offered: it falls back to the terminal feed and log estimates o
 
 ## Refresh and Switching
 
-Click the left icon to cycle between Claude, Codex and Antigravity, or select a provider from the
-context menu. The selection is persisted. Only the active provider is polled, and switching
-triggers an immediate refresh.
+Click the left icon to cycle between the available providers, or select a provider from the
+context menu. The selection is persisted. The provider on screen is polled, plus every available
+provider while Rotation is on (see below); switching triggers an immediate refresh.
 
 ## Security and Privacy Boundaries
 
@@ -161,7 +169,11 @@ GET https://api.deepseek.com/user/balance   (Authorization: Bearer <key>)
   with one empty, and the first listed is not always the one with money in it.
 - **Spend** is observed, not reported: `DeepSeekSpendLedger` counts each fall in the balance
   between readings as spend on the day it was seen, and each rise as a top-up, never netted
-  against spend. Time the app wasn't running lands on the next reading's day.
+  against spend. The balance is only polled while DeepSeek is on screen, so a drop whose
+  previous reading was on an earlier calendar day is booked on that earlier day, never on the
+  day it was noticed: "spent today" does not swallow a weekend. Changing the API key clears the
+  last balance and the ledger, so a second account is not read as a top-up or a spend. After a
+  401 the Keychain is not read again until the key is changed.
 - **Peak and off-peak** follow DeepSeek's published rule: 09:00–12:00 and 14:00–18:00 Beijing
   time, Monday to Friday, excluding Chinese statutory holidays. The holiday dates ship for the
   current year (`holiday-cn-<year>.json`) and are refreshed on the 28th of each month (Beijing time, or at the next launch if missed) from

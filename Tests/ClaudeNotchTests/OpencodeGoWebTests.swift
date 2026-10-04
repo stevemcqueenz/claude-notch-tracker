@@ -18,8 +18,9 @@ import Testing
         let snapshot = try OpencodeGoAPI.parseConsoleGoStatus(text: text, now: now)
 
         #expect(snapshot.provider == .opencodeGo)
-        #expect(snapshot.source == "web")
+        #expect(snapshot.source == "opencode.ai")
         #expect(snapshot.limits.map(\.label) == ["5-Hour", "7-Day", "Monthly"])
+        #expect(snapshot.limits.map(\.window) == [18_000.0, 604_800.0, 2_592_000.0] as [TimeInterval?])
         #expect(abs((snapshot.limits[0].usedFraction ?? 0) - 0.25) < 0.0001)
         #expect(abs((snapshot.limits[1].usedFraction ?? 0) - 0.40) < 0.0001)
         #expect(abs((snapshot.limits[2].usedFraction ?? 0) - 0.10) < 0.0001)
@@ -78,7 +79,7 @@ import Testing
         """
         let snapshot = try OpencodeGoAPI.parseAPIUsage(text: text, now: now)
 
-        #expect(snapshot.source == "api")
+        #expect(snapshot.source == "API")
         #expect(abs((snapshot.limits[0].usedFraction ?? 0) - 0.03) < 0.0001)
         #expect(abs((snapshot.limits[1].usedFraction ?? 0) - 0.12) < 0.0001)
         #expect(abs((snapshot.limits[2].usedFraction ?? 0) - 0.64) < 0.0001)
@@ -167,7 +168,7 @@ import Testing
 
         #expect(merged.limits == web.limits)
         #expect(merged.stats == web.stats)
-        #expect(merged.source == "web")
+        #expect(merged.source == "opencode.ai")
         #expect(merged.renewsAt == web.renewsAt)
         #expect(merged.dailySeries == series)
         #expect(merged.chartTitle == "last 7 days · local")
