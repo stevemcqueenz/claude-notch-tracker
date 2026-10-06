@@ -52,6 +52,9 @@ struct TrackpadSwipeReader: NSViewRepresentable {
             if event.momentumPhase != [] { return axis == .horizontal }
             // No phase = a discrete mouse wheel, not a swipe.
             guard event.phase != [] else { return false }
+            // Fingers merely resting on the pad (followed by .cancelled if they never move). The
+            // axis may still be .horizontal from the last swipe, which would replay its stale dx.
+            if event.phase.contains(.mayBegin) { axis = .ignored; return false }
 
             if event.phase.contains(.began) {
                 let p = convert(event.locationInWindow, from: nil)
