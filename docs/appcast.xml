@@ -3,6 +3,22 @@
     <channel>
         <title>Claude Notch</title>
         <item>
+            <title>0.4.1</title>
+            <description><![CDATA[
+                <h2>A small trackpad fix</h2>
+                <ul>
+                    <li>Resting two fingers on the trackpad after a swipe no longer shifts the expanded card sideways until you lift them.</li>
+                </ul>
+                <p>Found and fixed by <a href="https://github.com/palemoky">@palemoky</a> (#18). Thank you!</p>
+            ]]></description>
+            <pubDate>Tue, 06 Oct 2026 19:04:20 +0000</pubDate>
+            <sparkle:version>0.4.1</sparkle:version>
+            <sparkle:shortVersionString>0.4.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/stevemcqueenz/claude-notch-tracker/releases/download/v0.4.1/ClaudeNotch.zip" length="2000062" type="application/octet-stream" sparkle:edSignature="5L/MetS0iCztgzGcCvJyS9NTNlneYIYnDwjcwqiyJRnsb+EPHqfKP6vf2GNpA8NDKYBnFIvLsOw5c07l/vdUCw=="/>
+        </item>
+        <item>
             <title>0.4.0</title>
             <description><![CDATA[
                 <h2>Two more providers, and rotation</h2>
