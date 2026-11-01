@@ -216,6 +216,7 @@ struct IslandView: View {
                                     Image(systemName: "timer").font(.system(size: 9, weight: .semibold))
                                     Text(Fmt.cacheLeft(cache.expiresAt.timeIntervalSince(timeline.date)))
                                         .font(.system(size: 12, weight: .semibold)).monospacedDigit()
+                                        .lineLimit(1).fixedSize()
                                 }
                                 .foregroundStyle(color(.warn))
                                 .help(cacheHelp(cache, at: timeline.date))
