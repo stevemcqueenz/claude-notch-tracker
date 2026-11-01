@@ -222,7 +222,7 @@ final class AppModel {
 
         var currentSessions = sessionsToday.map {
             UsageSessionMetric(id: $0.id, name: $0.name, cost: $0.cost,
-                               tokens: $0.tokens, last: $0.last)
+                               tokens: $0.tokens, last: $0.last, cache: $0.cache)
         }
         if currentSessions.isEmpty, !snapshot.isEmpty {
             currentSessions.append(UsageSessionMetric(

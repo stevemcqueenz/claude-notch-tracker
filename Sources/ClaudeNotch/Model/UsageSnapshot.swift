@@ -9,6 +9,7 @@ struct ProjectUsage: Equatable, Sendable, Identifiable {
     let cost: Double
     let tokens: Int
     let last: Date          // most recent activity in the window
+    var cache: PromptCacheStatus? = nil
 }
 
 struct UsageSnapshot: Equatable, Sendable {

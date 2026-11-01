@@ -54,9 +54,12 @@ final class UsageStore {
             if e.timestamp > u.last { u.last = e.timestamp; u.cwd = e.cwd }
             bySession[e.sessionId] = u
         }
+        // From all events, not just today's: a cache written before midnight is still live after it.
+        let caches = PromptCacheEstimator.statuses(from: events)
         let projectsToday = bySession.map { sid, v -> ProjectUsage in
             let name = titles[sid] ?? (v.cwd.isEmpty ? "session" : (v.cwd as NSString).lastPathComponent)
-            return ProjectUsage(id: sid, name: name, cost: v.cost, tokens: v.tokens, last: v.last)
+            return ProjectUsage(id: sid, name: name, cost: v.cost, tokens: v.tokens, last: v.last,
+                                cache: caches[sid])
         }.sorted { $0.last > $1.last }
 
         var byModel: [String: Int] = [:]

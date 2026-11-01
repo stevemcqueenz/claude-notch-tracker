@@ -7,6 +7,7 @@ enum LogParser {
         let sessionId: String?
         let requestId: String?
         let cwd: String?
+        let isSidechain: Bool?
         let message: Message?
     }
     private struct Message: Decodable {
@@ -137,6 +138,7 @@ enum LogParser {
             outputTokens: usage.output_tokens ?? 0,
             cacheCreationTokens: usage.cache_creation_input_tokens ?? 0,
             cacheReadTokens: usage.cache_read_input_tokens ?? 0,
-            cacheCreation1hTokens: usage.cache_creation?.ephemeral_1h_input_tokens ?? 0)
+            cacheCreation1hTokens: usage.cache_creation?.ephemeral_1h_input_tokens ?? 0,
+            isSidechain: line.isSidechain ?? false)
     }
 }
