@@ -78,8 +78,15 @@ final class AppModel {
     // MARK: display values (prefer live limits, then terminal feed, then estimate)
 
     private var claudeSessionUsage: Double? {
-        limits?.sessionPct ?? statuslineUsage ?? snapshot.blockUsageEstimate
+        // Live limits are authoritative even about absence: when claude.ai reports no 5-hour
+        // limit, a terminal feed or a local block estimate would be a number for a limit that
+        // isn't being enforced.
+        if let l = limits { return l.sessionPct }
+        return statuslineUsage ?? snapshot.blockUsageEstimate
     }
+    /// False only when live limits arrived without a 5-hour limit (claude.ai suspended it); the
+    /// card is then hidden so 7-Day leads, and it comes back by itself once the API reports it.
+    private var claudeHasSessionLimit: Bool { limits == nil || limits?.sessionPct != nil }
     var sessionUsage: Double? { activeProviderSnapshot.primaryUsage }
     var weeklyUsage: Double? { limits?.weeklyPct }
     var fableUsage: Double? { limits?.fablePct }          // Fable's own weekly limit (if provided)
@@ -188,12 +195,13 @@ final class AppModel {
     }
 
     private var claudeProviderSnapshot: ProviderUsageSnapshot {
-        var usageLimits = [
-            UsageLimitMetric(id: "claude-session", label: "5-Hour",
-                             usedFraction: claudeSessionUsage, resetsAt: sessionResetsAt),
-            UsageLimitMetric(id: "claude-weekly", label: "7-Day",
-                             usedFraction: weeklyUsage, resetsAt: weeklyResetsAt),
-        ]
+        var usageLimits: [UsageLimitMetric] = []
+        if claudeHasSessionLimit {
+            usageLimits.append(UsageLimitMetric(id: "claude-session", label: "5-Hour",
+                                                usedFraction: claudeSessionUsage, resetsAt: sessionResetsAt))
+        }
+        usageLimits.append(UsageLimitMetric(id: "claude-weekly", label: "7-Day",
+                                            usedFraction: weeklyUsage, resetsAt: weeklyResetsAt))
         if fableUsage != nil {
             usageLimits.append(UsageLimitMetric(id: "claude-fable", label: "Fable",
                                                 usedFraction: fableUsage, resetsAt: fableResetsAt))
@@ -437,12 +445,13 @@ final class AppModel {
     }
 
     /// Fetch live claude.ai limits off-main (Keychain prompt appears on first run).
-    /// Only replaces the last-known-good limits with a response that actually carries a
-    /// session %, so a partial/failed read can never clobber correct data.
+    /// Only replaces the last-known-good limits with a response that actually carries a limit,
+    /// so a partial/failed read can never clobber correct data. Any limit counts, not just the
+    /// session one: claude.ai can suspend the 5-hour limit while the weekly ones keep running.
     func fetchLimits(force: Bool = false) {
         guard !isPaused, isPolled(.claude) else { return }
         Task { [claudeAPI] in
-            if let l = await claudeAPI.fetch(force: force), l.sessionPct != nil { self.applyLimits(l) }
+            if let l = await claudeAPI.fetch(force: force), l.hasAnyLimit { self.applyLimits(l) }
         }
     }
 
