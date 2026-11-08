@@ -134,7 +134,7 @@ island rotate on its own every 10 s, 30 s or minute (it holds still while the ca
 | **Swipe** left or right, or tap the dots | Switch between the limits page and the detail page |
 | **Tap** the sessions block | Flip between today's sessions and all-time top projects |
 | **Click** the left icon | Cycle through your installed providers |
-| **Right-click** the island | Provider, Icon, DeepSeek API Key, Rotate providers, Pause, Animate icon, Hide in full screen, Launch at Login, Check for Updates, GitHub Repository, Quit |
+| **Right-click** the island | Provider, Icon, DeepSeek API Key, Rotate providers, Pause, Animate icon, Hide in full screen, Cache countdown in pill, Launch at Login, Check for Updates, GitHub Repository, Quit |
 
 ## Privacy
 

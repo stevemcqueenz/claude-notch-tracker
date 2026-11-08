@@ -154,6 +154,9 @@ struct IslandView: View {
         Button(model.isPaused ? "Resume tracking" : "Pause tracking") { model.togglePause() }
         Button((model.animateIcon ? "✓ " : "") + "Animate icon") { model.toggleAnimateIcon() }
         Button((model.hideInFullscreen ? "✓ " : "") + "Hide in full screen") { model.toggleHideInFullscreen() }
+        Button((model.cacheCountdownInPill ? "✓ " : "") + "Cache countdown in pill") {
+            model.toggleCacheCountdownInPill()
+        }
         Button((LoginItem.isEnabled ? "✓ " : "") + "Launch at Login") { LoginItem.toggle() }
         Divider()
         Button("Check for Updates…") { Updater.shared.checkForUpdates() }
@@ -209,7 +212,8 @@ struct IslandView: View {
                 } else {
                     TimelineView(.periodic(from: .now, by: 15)) { timeline in
                         HStack(spacing: 5) {
-                            if let cache = provider.sessions.first?.cache,
+                            if model.cacheCountdownInPill,
+                               let cache = provider.sessions.first?.cache,
                                cache.isExpiringSoon(at: timeline.date) {
                                 // The usage % gives way so the expiry is seen before it happens.
                                 HStack(spacing: 2) {
