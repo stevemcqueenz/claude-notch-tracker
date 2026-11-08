@@ -19,6 +19,11 @@ struct ClaudeLimits: Sendable {
     var fableResetsAt: Date?
     var source: String?          // where the session came from (e.g. "Brave")
     var fetchedAt: Date
+
+    /// True when the response carried at least one real account limit. The 5-hour limit alone is
+    /// not the test: claude.ai can drop it (`"five_hour": null`) while the weekly limits stay, and
+    /// such a response is still authoritative, not a failed read.
+    var hasAnyLimit: Bool { sessionPct != nil || weeklyPct != nil || fablePct != nil }
 }
 
 /// Finds a logged-in claude.ai session — from Claude Desktop OR any supported browser — and
@@ -162,7 +167,7 @@ actor ClaudeAPIService {
         guard (resp as? HTTPURLResponse)?.statusCode == 200,
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return .rejected }
-        var limits = parse(obj, source: source)
+        var limits = Self.parse(obj, source: source)
         if let (minor, currency) = await prepaidBalance(org: org, cookieHeader: header) {
             limits.creditsBalanceMinor = minor
             limits.creditsCurrency = currency
@@ -189,20 +194,24 @@ actor ClaudeAPIService {
         return (amount, (obj["currency"] as? String) ?? "EUR")
     }
 
-    private func parse(_ obj: [String: Any], source: String) -> ClaudeLimits {
+    /// Internal (not private) and static so the parsing can be tested against real responses.
+    static func parse(_ obj: [String: Any], source: String, now: Date = Date()) -> ClaudeLimits {
+        func date(_ s: String?) -> Date? {
+            guard let s else { return nil }
+            if let d = ISO8601DateFormatter().date(from: s) { return d }
+            let f = ISO8601DateFormatter()
+            f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return f.date(from: s)
+        }
         func node(_ key: String) -> (Double?, Date?) {
             guard let n = obj[key] as? [String: Any] else { return (nil, nil) }
             let util = (n["utilization"] as? NSNumber)?.doubleValue
-            let resetStr = (n["resets_at"] as? String) ?? (n["resetsAt"] as? String)
-            let reset = resetStr.flatMap { s -> Date? in
-                let f1 = ISO8601DateFormatter()
-                if let d = f1.date(from: s) { return d }
-                let f2 = ISO8601DateFormatter()
-                f2.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                return f2.date(from: s)
-            }
+            let reset = date((n["resets_at"] as? String) ?? (n["resetsAt"] as? String))
             return (util.map { min(1, max(0, $0 / 100)) }, reset)
         }
+        let limitEntries = obj["limits"] as? [[String: Any]] ?? []
+        // `five_hour` may be null on purpose: claude.ai can suspend the session limit while the
+        // weekly ones keep running. The caller then shows no 5-hour figure rather than a guess.
         let (s, sr) = node("five_hour")
         var (w, wr) = node("seven_day")
         if w == nil {   // /api/oauth/usage splits the 7-day limit by model
@@ -210,6 +219,13 @@ actor ClaudeAPIService {
             let (ws, wsr) = node("seven_day_sonnet")
             w = [wo, ws].compactMap { $0 }.max()
             wr = wor ?? wsr
+        }
+        // Newer responses also list the account-wide weekly limit in `limits` as "weekly_all"
+        // (percent 0–100), carrying the same figure as `seven_day`. Use it if the legacy keys go.
+        if w == nil, let e = limitEntries.first(where: { ($0["kind"] as? String) == "weekly_all" }),
+           let p = (e["percent"] as? NSNumber)?.doubleValue {
+            w = min(1, max(0, p / 100))
+            wr = date(e["resets_at"] as? String)
         }
         // Extra-usage consumption: `extra_usage.utilization` is null until something is spent, but
         // the newer `spend` block always carries `percent` when the feature is enabled — prefer
@@ -233,17 +249,12 @@ actor ClaudeAPIService {
         // `limits` array whose scope.model.display_name is "Fable"; its figure is `percent` (0–100).
         var f: Double?
         var fr: Date?
-        if let arr = obj["limits"] as? [[String: Any]] {
-            for e in arr {
-                let model = (e["scope"] as? [String: Any])?["model"] as? [String: Any]
-                guard (model?["display_name"] as? String) == "Fable" else { continue }
-                if let p = (e["percent"] as? NSNumber)?.doubleValue { f = min(1, max(0, p / 100)) }
-                if let rs = e["resets_at"] as? String {
-                    let iso = ISO8601DateFormatter(); iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                    fr = iso.date(from: rs) ?? ISO8601DateFormatter().date(from: rs)
-                }
-                break
-            }
+        for e in limitEntries {
+            let model = (e["scope"] as? [String: Any])?["model"] as? [String: Any]
+            guard (model?["display_name"] as? String) == "Fable" else { continue }
+            if let p = (e["percent"] as? NSNumber)?.doubleValue { f = min(1, max(0, p / 100)) }
+            fr = date(e["resets_at"] as? String)
+            break
         }
 
         return ClaudeLimits(sessionPct: s, sessionResetsAt: sr,
@@ -252,7 +263,7 @@ actor ClaudeAPIService {
                             spendUsedMinor: spendUsed, spendCapMinor: spendCap,
                             spendCurrency: spendCurrency,
                             fablePct: f, fableResetsAt: fr,
-                            source: source, fetchedAt: Date())
+                            source: source, fetchedAt: now)
     }
 
     // MARK: - Claude Code CLI (OAuth token in the Keychain)
@@ -286,7 +297,7 @@ actor ClaudeAPIService {
               (resp as? HTTPURLResponse)?.statusCode == 200,
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return nil }
-        return parse(obj, source: "Claude Code")
+        return Self.parse(obj, source: "Claude Code")
     }
 
     /// The Claude Code CLI stores its OAuth credentials as JSON in the login Keychain under the
