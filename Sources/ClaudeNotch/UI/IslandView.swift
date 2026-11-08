@@ -207,12 +207,27 @@ struct IslandView: View {
                         Circle().fill(color(pill.tint)).frame(width: 7, height: 7)
                     }
                 } else {
-                    HStack(spacing: 5) {
-                        Text(provider.primaryUsage.map(Fmt.pct) ?? "—")
-                            .font(.system(size: 12, weight: .semibold)).monospacedDigit()
-                            .foregroundStyle(.white)
-                        Ring(fraction: used, state: ringState(for: used), lineWidth: 3)
-                            .frame(width: 14, height: 14)
+                    TimelineView(.periodic(from: .now, by: 15)) { timeline in
+                        HStack(spacing: 5) {
+                            if let cache = provider.sessions.first?.cache,
+                               cache.isExpiringSoon(at: timeline.date) {
+                                // The usage % gives way so the expiry is seen before it happens.
+                                HStack(spacing: 2) {
+                                    Image(systemName: "timer").font(.system(size: 9, weight: .semibold))
+                                    Text(Fmt.cacheLeft(cache.expiresAt.timeIntervalSince(timeline.date)))
+                                        .font(.system(size: 12, weight: .semibold)).monospacedDigit()
+                                        .lineLimit(1).fixedSize()
+                                }
+                                .foregroundStyle(color(.warn))
+                                .help(cacheHelp(cache, at: timeline.date))
+                            } else {
+                                Text(provider.primaryUsage.map(Fmt.pct) ?? "—")
+                                    .font(.system(size: 12, weight: .semibold)).monospacedDigit()
+                                    .foregroundStyle(.white)
+                            }
+                            Ring(fraction: used, state: ringState(for: used), lineWidth: 3)
+                                .frame(width: 14, height: 14)
+                        }
                     }
                 }
             }
@@ -475,11 +490,12 @@ struct IslandView: View {
                 }
             }
             if sessions.isEmpty {
-                sessionRow("No recent activity", cost: nil, tokens: nil, last: nil, muted: true)
+                sessionRow("No recent activity", cost: nil, tokens: nil, last: nil,
+                           cache: nil, muted: true)
             } else {
                 ForEach(Array(sessions.prefix(3))) { session in
                     sessionRow(session.name, cost: session.cost, tokens: session.tokens,
-                               last: session.last, muted: false)
+                               last: session.last, cache: session.cache, muted: false)
                 }
             }
         }
@@ -497,12 +513,36 @@ struct IslandView: View {
         .help(hasAlternate ? "Click to switch session views" : "Recent provider activity")
     }
 
+    private func cacheHelp(_ cache: PromptCacheStatus, at now: Date) -> String {
+        let cost = Fmt.usd(cache.rebuildCost)
+        return cache.isExpired(at: now)
+            ? "Prompt cache likely expired: the next turn costs about \(cost) more to rebuild it"
+            : "Prompt cache expires in about \(Fmt.cacheLeft(cache.expiresAt.timeIntervalSince(now))). "
+                + "After that, the next turn costs about \(cost) more"
+    }
+
+    /// Ticks on its own because a countdown changes while the snapshot, and so the row, does not.
+    private func cacheCountdown(_ cache: PromptCacheStatus) -> some View {
+        TimelineView(.periodic(from: .now, by: 15)) { timeline in
+            let now = timeline.date
+            let expired = cache.isExpired(at: now)
+            Text(expired ? "cold" : Fmt.cacheLeft(cache.expiresAt.timeIntervalSince(now)))
+                .font(.system(size: 11, weight: .medium)).monospacedDigit().lineLimit(1)
+                .foregroundStyle(cache.isExpiringSoon(at: now)
+                                 ? color(.warn) : .white.opacity(expired ? 0.35 : 0.6))
+                .help(cacheHelp(cache, at: now))
+                .accessibilityLabel(cacheHelp(cache, at: now))
+        }
+        .fixedSize()
+    }
+
     private func sessionRow(_ project: String, cost: Double?, tokens: Int?, last: Date?,
-                            muted: Bool) -> some View {
+                            cache: PromptCacheStatus?, muted: Bool) -> some View {
         HStack(spacing: 6) {
             Text(project).font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.white.opacity(muted ? 0.5 : 0.85)).lineLimit(1).truncationMode(.tail)
             Spacer(minLength: 8)
+            if let cache { cacheCountdown(cache) }
             if let cost, let tokens {
                 (Text(Fmt.money(cost, currency: provider.currency)).foregroundStyle(.white)
                     + Text("  ·  \(Fmt.tokens(tokens))").foregroundStyle(.white.opacity(0.45)))

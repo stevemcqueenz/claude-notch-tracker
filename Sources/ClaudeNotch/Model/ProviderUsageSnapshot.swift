@@ -87,6 +87,8 @@ struct UsageSessionMetric: Equatable, Sendable, Identifiable {
     let cost: Double?
     let tokens: Int?
     let last: Date
+    /// Nil hides the countdown, so a provider opts in by estimating this for its own sessions.
+    var cache: PromptCacheStatus? = nil
 }
 
 /// One day of activity for the week chart. `cost` set (Claude's local logs) makes the chart

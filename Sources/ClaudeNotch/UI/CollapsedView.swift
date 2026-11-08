@@ -30,6 +30,10 @@ enum Fmt {
         if s < 86_400 { return "\(s / 3600)h" }
         return "\(s / 86_400)d"
     }
+    /// "42m" / "<1m" — an estimate, so it never claims second-level precision.
+    static func cacheLeft(_ t: TimeInterval) -> String {
+        t < 60 ? "<1m" : dur(t)
+    }
     static func tokens(_ n: Int) -> String {
         switch n {
         case 1_000_000...: return String(format: "%.1fM", Double(n) / 1_000_000)
