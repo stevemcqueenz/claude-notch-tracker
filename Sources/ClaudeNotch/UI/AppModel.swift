@@ -91,7 +91,13 @@ final class AppModel {
     /// False only when live limits arrived without a 5-hour limit (claude.ai suspended it); the
     /// card is then hidden so 7-Day leads, and it comes back by itself once the API reports it.
     private var claudeHasSessionLimit: Bool { limits == nil || limits?.sessionPct != nil }
-    var sessionUsage: Double? { activeProviderSnapshot.primaryUsage }
+    /// The closed pill's number: the lead limit, or 100% once a limit that blocks the whole account
+    /// is used up (the same test that stops Clawd), so a spent month never reads as an idle 0%.
+    /// Antigravity's limits are per model group, so a spent group there doesn't take the pill.
+    var pillUsage: Double? {
+        if isAtLimit, selectedProvider != .antigravity { return 1 }
+        return activeProviderSnapshot.primaryUsage
+    }
     var weeklyUsage: Double? { limits?.weeklyPct }
     var fableUsage: Double? { limits?.fablePct }          // Fable's own weekly limit (if provided)
     var fableResetsAt: Date? { limits?.fableResetsAt }

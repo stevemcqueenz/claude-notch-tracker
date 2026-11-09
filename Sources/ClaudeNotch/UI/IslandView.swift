@@ -40,7 +40,7 @@ struct IslandView: View {
     private var gap: CGFloat { notchWidth }
     private var closedWidth: CGFloat { wing + gap + wing + edgeInset * 2 }
     private var provider: ProviderUsageSnapshot { model.activeProviderSnapshot }
-    private var used: Double { provider.primaryUsage ?? 0 }
+    private var used: Double { model.pillUsage ?? 0 }
     /// Loaded once each — these are read on every render of the closed row, and hitting the disk
     /// per frame during animations would be pure waste. MainActor because NSImage isn't Sendable.
     @MainActor private static let codexIcon: NSImage? = mark(named: "codex")
@@ -225,7 +225,7 @@ struct IslandView: View {
                                 .foregroundStyle(color(.warn))
                                 .help(cacheHelp(cache, at: timeline.date))
                             } else {
-                                Text(provider.primaryUsage.map(Fmt.pct) ?? "—")
+                                Text(model.pillUsage.map(Fmt.pct) ?? "—")
                                     .font(.system(size: 12, weight: .semibold)).monospacedDigit()
                                     .foregroundStyle(.white)
                             }
@@ -243,7 +243,7 @@ struct IslandView: View {
             .onTapGesture { model.isExpanded.toggle() }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(model.selectedProvider.displayName) usage")
-            .accessibilityValue(provider.pill?.text ?? provider.primaryUsage.map(Fmt.pct) ?? "unknown")
+            .accessibilityValue(provider.pill?.text ?? model.pillUsage.map(Fmt.pct) ?? "unknown")
             .accessibilityHint(model.isExpanded ? "Collapses the usage card" : "Expands the usage card")
             .accessibilityAddTraits(.isButton)
         }
