@@ -46,17 +46,12 @@ struct UsageLimitMetric: Equatable, Sendable, Identifiable {
     let label: String
     let usedFraction: Double?
     let resetsAt: Date?
-    /// Absolute spend for this window, e.g. "$3.00 of $12.00" (opencode-go's micro-cent meters).
-    /// nil whenever only a bare percent is known, so every other provider renders unchanged.
-    let subtitle: String?
 
-    init(id: String, label: String, usedFraction: Double?, resetsAt: Date?,
-         subtitle: String? = nil) {
+    init(id: String, label: String, usedFraction: Double?, resetsAt: Date?) {
         self.id = id
         self.label = label
         self.usedFraction = usedFraction.map { min(1, max(0, $0)) }
         self.resetsAt = resetsAt
-        self.subtitle = subtitle
     }
 }
 

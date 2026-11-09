@@ -28,8 +28,22 @@ actor OpencodeGoUsageProvider {
             return await resolveLocal(now: now)
         case .unavailable:
             // Nothing web-signed-in to try: local history is the intended fallback, then last good.
+            if let recent = Self.recentWeb(lastGood, now: now) { return recent }
             return await resolveLocal(now: now)
         }
+    }
+
+    /// How long server meters outrank local estimates once the web session stops answering.
+    static let webGrace: TimeInterval = 3600
+
+    /// The last server snapshot while it is under `webGrace` old, else nil. Local history only sees
+    /// this Mac's spend against assumed plan limits and a calendar month, so swapping it in for a
+    /// moment's cookie trouble would show a used-up plan as untouched; the old web numbers dim as
+    /// stale instead.
+    static func recentWeb(_ lastGood: ProviderUsageSnapshot?, now: Date) -> ProviderUsageSnapshot? {
+        guard let lastGood, lastGood.source != "local", let at = lastGood.fetchedAt,
+              now.timeIntervalSince(at) < webGrace else { return nil }
+        return lastGood
     }
 
     private enum Local: Sendable {

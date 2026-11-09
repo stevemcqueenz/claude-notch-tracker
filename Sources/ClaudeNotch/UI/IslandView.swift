@@ -571,19 +571,16 @@ struct IslandView: View {
     @ViewBuilder private func providerLimitTile(_ metric: UsageLimitMetric) -> some View {
         let isClaudeSession = metric.id == "claude-session"
         limitTile(metric.label, metric.usedFraction, resets: metric.resetsAt,
-                  eta: isClaudeSession && !prefReset ? model.etaToLimit : nil,
-                  subtitle: metric.subtitle)
+                  eta: isClaudeSession && !prefReset ? model.etaToLimit : nil)
             .contentShape(Rectangle())
             .onTapGesture {
                 if isClaudeSession, model.etaToLimit != nil { prefReset.toggle() }
             }
     }
 
-    // A limit tile: label, big colour-coded %, a "resets in …" subline, and — for opencode-go's
-    // micro-cent meters — an absolute-spend subline. The subtitle is nil for every other provider,
-    // so their pixels are unchanged.
+    // A limit tile: label, big colour-coded %, and a "resets in …" subline.
     private func limitTile(_ label: String, _ value: Double?, resets: Date?,
-                           eta: TimeInterval? = nil, subtitle: String? = nil) -> some View {
+                           eta: TimeInterval? = nil) -> some View {
         tileBox {
             Text(label).font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
             Text(value.map(Fmt.pct) ?? "—")
@@ -596,10 +593,6 @@ struct IslandView: View {
             } else {
                 Text(resets.map { "resets in \(Fmt.until($0))" } ?? "resets —")
                     .font(.system(size: 9.5)).foregroundStyle(.white.opacity(0.45)).lineLimit(1)
-            }
-            if let subtitle {
-                Text(subtitle).font(.system(size: 9.5)).monospacedDigit()
-                    .foregroundStyle(.white.opacity(0.4)).lineLimit(1).minimumScaleFactor(0.7)
             }
         }
     }

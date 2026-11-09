@@ -42,6 +42,7 @@ actor OpencodeGoAPI {
     static let consoleWorkspacesURL = URL(string: "https://opencode.ai/console/api/orgs")!
     static let consoleGoStatusURL = URL(string: "https://opencode.ai/console/api/go/status")!
     static let consoleBillingStatusURL = URL(string: "https://opencode.ai/console/api/billing/status")!
+    static let consoleGoActivityURL = URL(string: "https://opencode.ai/console/api/activity/go")!
     static let usageAPIURL = URL(string: "https://opencode.ai/zen/go/v1/usage")!
 
     private let cookieReader = BrowserCookieReader.shared
@@ -84,12 +85,12 @@ actor OpencodeGoAPI {
         for source in await orderedSources() {
             if let until = backoffUntil[source.name], until > now { continue }
             guard let jar = await cookieReader.readCookies(from: source, host: Self.host) else {
-                backoffUntil[source.name] = now.addingTimeInterval(backoff)
+                backOff(source, now: now)
                 continue
             }
             let header = Self.cookieHeader(from: jar)
             guard !header.isEmpty else {
-                backoffUntil[source.name] = now.addingTimeInterval(backoff)
+                backOff(source, now: now)
                 continue
             }
             switch await request(cookieHeader: header, workspaceID: nil, now: now) {
@@ -101,10 +102,18 @@ actor OpencodeGoAPI {
             case .offline:
                 return .failed   // don't blame the source, don't probe the others (no new prompts)
             case .rejected:
-                backoffUntil[source.name] = now.addingTimeInterval(backoff)
+                backOff(source, now: now)
             }
         }
         return .unavailable
+    }
+
+    /// Only Keychain-backed stores wait out a failure, since reading them can raise a prompt.
+    /// Firefox-style stores are plain files, so one bad read (a cookie mid-rotation) is retried on
+    /// the next poll instead of leaving the island on local estimates for 15 minutes.
+    private func backOff(_ source: BrowserCookieReader.Source, now: Date) {
+        guard source.keychainService != nil else { return }
+        backoffUntil[source.name] = now.addingTimeInterval(backoff)
     }
 
     /// Candidate stores with the last known-good one moved to the front.
@@ -136,6 +145,9 @@ actor OpencodeGoAPI {
             if let balance = await Self.fetchZenBalance(cookieHeader: cookieHeader, workspaceID: workspace) {
                 snapshot.stats.append(UsageStatMetric(
                     id: "zen-balance", label: "zen balance", value: Fmt.usd(balance), subtitle: nil))
+            }
+            if let top = await Self.fetchTopModel(cookieHeader: cookieHeader, workspaceID: workspace) {
+                snapshot.stats.append(top)
             }
             return .ok(snapshot, workspaceID: workspace)
         } catch OpencodeGoAPIError.invalidCredentials {
@@ -204,6 +216,16 @@ actor OpencodeGoAPI {
         return parseZenBalance(text: text)
     }
 
+    /// Best-effort, like the balance: the Go period's most used model, as the console's Go card shows it.
+    private static func fetchTopModel(cookieHeader: String, workspaceID: String) async -> UsageStatMetric? {
+        var headers = cookieHeaders(cookieHeader)
+        headers["x-org-id"] = workspaceID
+        guard let (data, http) = try? await get(consoleGoActivityURL, headers: headers),
+              http.statusCode == 200,
+              let text = String(data: data, encoding: .utf8) else { return nil }
+        return parseTopModel(text: text)
+    }
+
     private static func cookieHeaders(_ cookieHeader: String) -> [String: String] {
         ["Cookie": cookieHeader, "Accept": "application/json", "User-Agent": userAgent]
     }
@@ -247,7 +269,7 @@ actor OpencodeGoAPI {
         guard let access = accessValue as? [String: Any],
               let meters = access["meters"] as? [String: Any],
               let fiveHour = meters["fiveHour"] as? [String: Any],
-              meter(from: fiveHour).percent != nil else {
+              percent(from: fiveHour) != nil else {
             throw OpencodeGoAPIError.parseFailed("Invalid Console usage payload.")
         }
         let endsAt = date(from: access["endsAt"])
@@ -271,7 +293,7 @@ actor OpencodeGoAPI {
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let usage = root["usage"] as? [String: Any],
               let rolling = usage["rolling"] as? [String: Any],
-              meter(from: rolling).percent != nil else {
+              percent(from: rolling) != nil else {
             throw OpencodeGoAPIError.parseFailed("Missing usage fields.")
         }
         let renewsAt = date(from: usage["renewsAt"]) ?? date(from: usage["renewAt"])
@@ -294,12 +316,45 @@ actor OpencodeGoAPI {
         return double(root["balanceMicroCents"]).map { $0 / 100_000_000 }
     }
 
+    /// `GET /console/api/activity/go`: the current Go period's `models`, each with `totalRequests`
+    /// (a decimal string). Ranked by requests, like the console, with the model's share as subline.
+    static func parseTopModel(text: String) -> UsageStatMetric? {
+        guard let data = text.data(using: .utf8),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let rows = root["models"] as? [[String: Any]] else { return nil }
+        let models = rows.compactMap { row -> (name: String, requests: Double)? in
+            guard let name = row["model"] as? String, !name.isEmpty,
+                  let requests = double(row["totalRequests"]) else { return nil }
+            return (name, requests)
+        }
+        guard let top = models.max(by: { $0.requests < $1.requests }), top.requests > 0 else { return nil }
+        let total = models.reduce(0) { $0 + $1.requests }
+        return UsageStatMetric(id: "top-model", label: "top model", value: modelDisplayName(top.name),
+                               subtitle: "\(Int((top.requests / total * 100).rounded()))% of requests")
+    }
+
+    /// "deepseek-v4.1-flash" → "DeepSeek V4.1 Flash", "glm-5.3-flash" → "GLM 5.3 Flash". The
+    /// console names Go models from a table of its own; title-casing the id, with the brands'
+    /// own spelling, keeps up with new models without that table.
+    static func modelDisplayName(_ id: String) -> String {
+        let brands = ["deepseek": "DeepSeek", "glm": "GLM", "minimax": "MiniMax", "gpt": "GPT",
+                      "kimi": "Kimi", "qwen": "Qwen", "grok": "Grok", "claude": "Claude",
+                      "gemini": "Gemini", "mimo": "MiMo"]
+        return id.split(separator: "-").map { part -> String in
+            let word = String(part)
+            if let brand = brands[word.lowercased()] { return brand }
+            // A brand glued to its version, e.g. "qwen3.8".
+            if let (key, brand) = brands.first(where: { word.lowercased().hasPrefix($0.key) }),
+               word.dropFirst(key.count).first?.isNumber == true {
+                return brand + word.dropFirst(key.count)
+            }
+            return word.prefix(1).uppercased() + word.dropFirst()
+        }.joined(separator: " ")
+    }
+
     private static func makeSnapshot(session: [String: Any], weekly: [String: Any]?,
                                      monthly: [String: Any]?, renewsAt: Date?,
                                      source: String, now: Date) -> ProviderUsageSnapshot {
-        let sessionMeter = meter(from: session)
-        let weeklyMeter = meter(from: weekly)
-        let monthlyMeter = meter(from: monthly)
         var stats: [UsageStatMetric] = []
         if let renewsAt {
             stats.append(UsageStatMetric(id: "renews", label: "Renews",
@@ -309,17 +364,14 @@ actor OpencodeGoAPI {
             provider: .opencodeGo,
             limits: [
                 UsageLimitMetric(id: "opencode-session", label: "5-Hour",
-                                 usedFraction: fraction(sessionMeter.percent),
-                                 resetsAt: resetDate(from: session, now: now),
-                                 subtitle: spendSubtitle(sessionMeter)),
+                                 usedFraction: fraction(percent(from: session)),
+                                 resetsAt: resetDate(from: session, now: now)),
                 UsageLimitMetric(id: "opencode-weekly", label: "7-Day",
-                                 usedFraction: fraction(weeklyMeter.percent),
-                                 resetsAt: resetDate(from: weekly, now: now),
-                                 subtitle: spendSubtitle(weeklyMeter)),
+                                 usedFraction: fraction(percent(from: weekly)),
+                                 resetsAt: resetDate(from: weekly, now: now)),
                 UsageLimitMetric(id: "opencode-monthly", label: "Monthly",
-                                 usedFraction: fraction(monthlyMeter.percent),
-                                 resetsAt: resetDate(from: monthly, now: now),
-                                 subtitle: spendSubtitle(monthlyMeter)),
+                                 usedFraction: fraction(percent(from: monthly)),
+                                 resetsAt: resetDate(from: monthly, now: now)),
             ],
             stats: stats,
             renewsAt: renewsAt,
@@ -327,33 +379,16 @@ actor OpencodeGoAPI {
             fetchedAt: now)
     }
 
-    /// A window's used / limit in dollars, e.g. "$3.00 of $12.00"; nil when only a percent is known.
-    private static func spendSubtitle(_ meter: ParsedMeter) -> String? {
-        guard let used = meter.used, let limit = meter.limit else { return nil }
-        return "\(Fmt.usd(used)) of \(Fmt.usd(limit))"
-    }
-
-    /// A meter's percent plus, when the console sends micro-cent amounts, the dollars behind it.
-    private struct ParsedMeter {
-        let percent: Double?
-        let used: Double?      // USD
-        let limit: Double?     // USD
-    }
-
-    private static func meter(from raw: [String: Any]?) -> ParsedMeter {
-        guard let raw else { return ParsedMeter(percent: nil, used: nil, limit: nil) }
-        var percent: Double?
+    /// A meter's percent used, 0...100: stated outright, or the console's micro-cent used / limit.
+    private static func percent(from raw: [String: Any]?) -> Double? {
+        guard let raw else { return nil }
         for key in ["usagePercent", "usedPercent", "percentUsed", "percent",
                     "usage_percent", "used_percent", "utilizationPercent", "utilization"] {
-            if let value = double(raw[key]) { percent = min(100, max(0, value)); break }
+            if let value = double(raw[key]) { return min(100, max(0, value)) }
         }
-        let used = double(raw["usedMicroCents"]).map { $0 / 100_000_000 }
-        let limit = double(raw["limitMicroCents"]).map { $0 / 100_000_000 }
-        // The console's micro-cent meters: usage / limit as a percentage.
-        if percent == nil, let used, let limit, limit > 0 {
-            percent = min(100, max(0, used / limit * 100))
-        }
-        return ParsedMeter(percent: percent, used: used, limit: limit)
+        guard let used = double(raw["usedMicroCents"]), let limit = double(raw["limitMicroCents"]),
+              limit > 0 else { return nil }
+        return min(100, max(0, used / limit * 100))
     }
 
     private static func fraction(_ percent: Double?) -> Double? { percent.map { $0 / 100 } }

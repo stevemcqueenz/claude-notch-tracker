@@ -102,6 +102,32 @@ import Testing
             text: #"{"billingMode":"prepaid","mode":"pay-as-you-go"}"#) == nil)
     }
 
+    @Test func topModelIsTheMostRequestedNotTheFirstListed() throws {
+        let text = """
+        {"startsAt":"2026-10-16T17:29:23.000Z","daily":[],"models":[
+          {"provider":"opencode-go","model":"glm-5.3-flash","totalRequests":"607"},
+          {"provider":"opencode-go","model":"deepseek-v4.1-flash","totalRequests":"51599"},
+          {"provider":"opencode-go","model":"minimax-m3.1-flash-free","totalRequests":"2444"}]}
+        """
+        let top = try #require(OpencodeGoAPI.parseTopModel(text: text))
+        #expect(top.id == "top-model")
+        #expect(top.value == "DeepSeek V4.1 Flash")
+        #expect(top.subtitle == "94% of requests")
+        #expect(OpencodeGoAPI.parseTopModel(text: "null") == nil)
+        #expect(OpencodeGoAPI.parseTopModel(text: #"{"models":[]}"#) == nil)
+    }
+
+    @Test(arguments: [
+        ("glm-5.3-flash", "GLM 5.3 Flash"),
+        ("minimax-m3.1-flash-free", "MiniMax M3.1 Flash Free"),
+        ("qwen3.8-max", "Qwen3.8 Max"),
+        ("kimi-k3.1-pro", "Kimi K3.1 Pro"),
+        ("some-new-model", "Some New Model"),
+    ])
+    func modelIdsGetTheirBrandsSpelling(id: String, name: String) {
+        #expect(OpencodeGoAPI.modelDisplayName(id) == name)
+    }
+
     @Test func apiKeyComesFromTheEnvironmentOnly() {
         #expect(OpencodeGoAPI.apiKey(environment: ["OPENCODE_API_KEY": "go_secret"]) == "go_secret")
         #expect(OpencodeGoAPI.apiKey(environment: ["OPENCODE_API_KEY": "   "]) == nil)
@@ -136,21 +162,22 @@ import Testing
         #expect(snapshot.stats.contains { $0.id == "renews" } == false)
     }
 
-    @Test func microCentMetersGetAnAbsoluteSubtitle() throws {
+    /// A used-up month with an unstarted 5-hour window (the live Go Plus shape) must not lose the
+    /// web numbers to local estimates when one poll can't reach the console.
+    @Test func recentWebNumbersOutlastAFailedPoll() throws {
         let text = """
-        {"access":{"meters":{"fiveHour":{
-          "limitMicroCents":"1200000000","usedMicroCents":"300000000"}}}}
+        {"access":{"endsAt":"2026-10-19T00:00:00Z","meters":{
+          "fiveHour":{"startsAt":null,"resetsAt":null,"limitMicroCents":"4800000000","usedMicroCents":"0"},
+          "month":{"limitMicroCents":"24000000000","usedMicroCents":"24000000000"}}}}
         """
-        let snapshot = try OpencodeGoAPI.parseConsoleGoStatus(text: text, now: now)
-        #expect(snapshot.limits[0].subtitle == "$3.00 of $12.00")
-    }
+        let web = try OpencodeGoAPI.parseConsoleGoStatus(text: text, now: now)
+        #expect(web.limits.map(\.usedFraction) == [0, nil, 1])
 
-    @Test func barePercentHasNoSubtitle() throws {
-        let text = """
-        {"access":{"meters":{"fiveHour":{"usagePercent":25}}}}
-        """
-        let snapshot = try OpencodeGoAPI.parseConsoleGoStatus(text: text, now: now)
-        #expect(snapshot.limits[0].subtitle == nil)
+        let local = ProviderUsageSnapshot(provider: .opencodeGo, source: "local", fetchedAt: now)
+        #expect(OpencodeGoUsageProvider.recentWeb(web, now: now.addingTimeInterval(600)) == web)
+        #expect(OpencodeGoUsageProvider.recentWeb(web, now: now.addingTimeInterval(7200)) == nil)
+        #expect(OpencodeGoUsageProvider.recentWeb(local, now: now) == nil)
+        #expect(OpencodeGoUsageProvider.recentWeb(nil, now: now) == nil)
     }
 
     @Test func attachingLocalSeriesKeepsTheWebNumbers() throws {
