@@ -3,6 +3,21 @@
     <channel>
         <title>Claude Notch</title>
         <item>
+            <title>0.4.4</title>
+            <description><![CDATA[
+                <h2>Your top Claude model</h2>
+                <ul>
+                    <li>The Claude card shows the Claude model you spent the most on over the last 7 days, and its share, for example "Opus 4.8, 72% of spend". It comes from this Mac's Claude Code logs, since claude.ai doesn't report usage per model, and it only appears when there is a week of local use to rank.</li>
+                </ul>
+            ]]></description>
+            <pubDate>Mon, 09 Nov 2026 12:32:13 +0000</pubDate>
+            <sparkle:version>0.4.4</sparkle:version>
+            <sparkle:shortVersionString>0.4.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/stevemcqueenz/claude-notch-tracker/releases/download/v0.4.4/ClaudeNotch.zip" length="2038308" type="application/octet-stream" sparkle:edSignature="n0q+rSH7SIAKX/PwoWn77RjfcXqHub9acczZhUNPdvLqV/nVxoh2RMSdmS/+lMvC+BgdyJhnAeEvElf8/70vBg=="/>
+        </item>
+        <item>
             <title>0.4.3</title>
             <description><![CDATA[
                 <h2>opencode-go shows what the console shows</h2>
