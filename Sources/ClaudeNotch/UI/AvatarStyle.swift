@@ -2,7 +2,7 @@ import SwiftUI
 import ServiceManagement
 
 enum AppInfo {
-    static let version = "0.4.3"
+    static let version = "0.4.4"
     static let tagline = "AI usage at a glance"
     static let repository = URL(string: "https://github.com/stevemcqueenz/claude-notch-tracker")!
 }
