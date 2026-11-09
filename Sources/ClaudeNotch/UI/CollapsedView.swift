@@ -43,6 +43,16 @@ enum Fmt {
     }
     static func usd(_ v: Double) -> String { String(format: "$%.2f", v) }
 
+    /// A Claude model id as people say it: "claude-opus-4-8" → "Opus 4.8",
+    /// "claude-sonnet-5-5-20261001" → "Sonnet 5.5", "claude-3-5-sonnet-20241022" → "Sonnet 3.5".
+    static func claudeModel(_ id: String) -> String {
+        let parts = id.split(separator: "-").map(String.init)
+            .filter { $0 != "claude" && !($0.count == 8 && $0.allSatisfy(\.isNumber)) }  // date stamp
+        let names = parts.filter { !$0.allSatisfy(\.isNumber) }.map { $0.prefix(1).uppercased() + $0.dropFirst() }
+        let version = parts.filter { $0.allSatisfy(\.isNumber) }.joined(separator: ".")
+        return (names + (version.isEmpty ? [] : [version])).joined(separator: " ")
+    }
+
     /// Money in a snapshot's own currency; nil is USD, which is what every pre-DeepSeek figure is.
     static func money(_ v: Double, currency: String?) -> String {
         guard let currency, currency != "USD" else { return usd(v) }

@@ -223,6 +223,15 @@ final class AppModel {
                             subtitle: projectedCostToday.map { "~\(Fmt.usd($0)) by tonight" }),
             UsageStatMetric(id: "credits", label: "credits",
                             value: creditsValue, subtitle: creditsSubtitle),
+        ]
+        // claude.ai reports no per-model usage, so the model comes from this Mac's Claude Code
+        // logs, and the tile shows only when they have a week of spend to rank.
+        if let top = lifetime.topWeekModel {
+            stats.append(UsageStatMetric(id: "top-model", label: "top model · local",
+                                         value: Fmt.claudeModel(top.model),
+                                         subtitle: "\(Fmt.pct(top.share)) of spend, 7 days"))
+        }
+        stats += [
             // All-time lives here now; the detail page belongs to the week chart + sessions,
             // and "tokens today" is redundant with the chart's highlighted today bar.
             UsageStatMetric(id: "all-time", label: "all-time · local",

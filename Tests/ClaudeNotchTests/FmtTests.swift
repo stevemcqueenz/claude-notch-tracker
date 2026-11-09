@@ -16,6 +16,16 @@ import Foundation
         #expect(Fmt.hm(4200) == "1h 10m")
     }
 
+    @Test(arguments: [
+        ("claude-opus-4-8", "Opus 4.8"),
+        ("claude-sonnet-5-5-20261001", "Sonnet 5.5"),
+        ("claude-3-5-sonnet-20241022", "Sonnet 3.5"),
+        ("claude-fable-5-1", "Fable 5.1"),
+    ])
+    func claudeModelIdsReadAsSpoken(id: String, name: String) {
+        #expect(Fmt.claudeModel(id) == name)
+    }
+
     @Test func pastDatesClampToZero() {
         #expect(Fmt.until(Date().addingTimeInterval(-500)) == "0m")
     }

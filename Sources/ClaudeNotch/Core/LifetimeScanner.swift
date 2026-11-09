@@ -16,12 +16,23 @@ actor LifetimeScanner {
         var projects: [ProjectUsage] = []   // biggest-spending projects of all time, cost-desc
         /// Per-day totals for the last ~7 days, keyed by local "yyyy-MM-dd" — feeds the week chart.
         var recentDays: [String: DayTotal] = [:]
+        /// Spend per Claude model over the last 7 days. Cost, not tokens: it tracks what draws down
+        /// the plan limits, where raw tokens are mostly cheap cache reads.
+        var weekModelCost: [String: Double] = [:]
+
+        /// The week's top model by spend and its share of that spend (0…1); nil without any.
+        var topWeekModel: (model: String, share: Double)? {
+            let total = weekModelCost.values.reduce(0, +)
+            guard total > 0, let top = weekModelCost.max(by: { $0.value < $1.value }) else { return nil }
+            return (top.key, top.value / total)
+        }
     }
 
     func scan() -> Totals {
         var totals = Totals()
         var byProject: [String: (tokens: Int, cost: Double, last: Date)] = [:]
         let recentCutoff = Date().addingTimeInterval(-8 * 86_400)
+        let weekCutoff = Date().addingTimeInterval(-7 * 86_400)
         let dayFormatter = DateFormatter()
         dayFormatter.calendar = Calendar(identifier: .gregorian)
         dayFormatter.locale = Locale(identifier: "en_US_POSIX")
@@ -43,6 +54,10 @@ actor LifetimeScanner {
                     day.tokens += e.totalTokens
                     day.cost += cost
                     totals.recentDays[key] = day
+                }
+                // Other backends and Claude Code's "<synthetic>" rows aren't Claude models.
+                if e.timestamp > weekCutoff, e.model.hasPrefix("claude-") {
+                    totals.weekModelCost[e.model, default: 0] += cost
                 }
                 let name = e.cwd.isEmpty ? "unknown" : (e.cwd as NSString).lastPathComponent
                 var p = byProject[name] ?? (0, 0, .distantPast)
