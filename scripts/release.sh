@@ -35,7 +35,9 @@ echo "▸ $TAG: build, Developer ID sign, notarize…"
 NOTARY_PROFILE="$NOTARY_PROFILE" bash scripts/make-app.sh
 
 # make-app.sh refuses ad-hoc signing without ALLOW_ADHOC; check anyway before shipping.
-codesign -dvv "$APP" 2>&1 | grep -q "Authority=Developer ID Application" \
+# Capture first: under pipefail, grep -q exiting early SIGPIPEs codesign and fails a good signature.
+SIGNATURE="$(codesign -dvv "$APP" 2>&1)"
+grep -q "Authority=Developer ID Application" <<<"$SIGNATURE" \
   || { echo "✗ not signed with a Developer ID"; exit 1; }
 xcrun stapler validate "$APP" >/dev/null || { echo "✗ notarization ticket missing"; exit 1; }
 
