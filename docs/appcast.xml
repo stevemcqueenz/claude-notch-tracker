@@ -3,6 +3,23 @@
     <channel>
         <title>Claude Notch</title>
         <item>
+            <title>0.4.2</title>
+            <description><![CDATA[
+                <h2>Ultra limits, and a prompt-cache countdown</h2>
+                <ul>
+                    <li><b>Limits work again on accounts without a 5-hour limit.</b> claude.ai no longer reports one for verified Ultra accounts, and the app threw the whole answer away, so 7-Day showed a dash and 5-Hour fell back to a local guess. Now the 5-Hour card hides, 7-Day leads, and the weekly and Fable meters show again.</li>
+                    <li><b>Prompt-cache countdown.</b> Each Claude session in the sessions list shows roughly how long its prompt cache stays warm. It turns amber in the last 5 minutes and then reads "cold". In those last 5 minutes the closed pill swaps its % for the countdown too. Turn that off with "Cache countdown in pill" in the right-click menu; the sessions list keeps its countdown either way.</li>
+                </ul>
+                <p>The Ultra fix is by <a href="https://github.com/adolfoflores">@adolfoflores</a> (#20) and the cache countdown by <a href="https://github.com/palemoky">@palemoky</a> (#19). Thank you both!</p>
+            ]]></description>
+            <pubDate>Mon, 09 Nov 2026 11:28:11 +0000</pubDate>
+            <sparkle:version>0.4.2</sparkle:version>
+            <sparkle:shortVersionString>0.4.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/stevemcqueenz/claude-notch-tracker/releases/download/v0.4.2/ClaudeNotch.zip" length="2032992" type="application/octet-stream" sparkle:edSignature="XgDhyuPM3quq4onhvbn9UMcR1cB8bOxdS4CZHDM7xtmHaltDhoC7DXjDko3TNUAk8Szr2o7y+7csW1y7v+xFAw=="/>
+        </item>
+        <item>
             <title>0.4.1</title>
             <description><![CDATA[
                 <h2>A small trackpad fix</h2>
