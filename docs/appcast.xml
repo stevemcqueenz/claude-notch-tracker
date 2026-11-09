@@ -3,6 +3,24 @@
     <channel>
         <title>Claude Notch</title>
         <item>
+            <title>0.4.3</title>
+            <description><![CDATA[
+                <h2>opencode-go shows what the console shows</h2>
+                <ul>
+                    <li><b>The real meters stay up.</b> When reading your opencode.ai login failed once, the app paused for 15 minutes and switched to a local estimate that only knows this Mac's spend. A used-up Go month could then show as 0%, resetting at the end of the calendar month. Now it tries again on the next update and keeps the last real numbers, dimmed, while it does.</li>
+                    <li><b>A used-up limit shows in the pill.</b> The closed pill showed only the first limit, so a used-up month next to an unstarted 5-hour window read as 0%. It now shows 100% in red when a limit that blocks your whole account runs out.</li>
+                    <li><b>Top model.</b> The opencode-go card shows the model you used most this period, by requests, like the console's Go card.</li>
+                    <li>The dollar lines under the opencode-go limits are gone, since the console itself shows only percentages.</li>
+                </ul>
+            ]]></description>
+            <pubDate>Mon, 09 Nov 2026 12:08:30 +0000</pubDate>
+            <sparkle:version>0.4.3</sparkle:version>
+            <sparkle:shortVersionString>0.4.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/stevemcqueenz/claude-notch-tracker/releases/download/v0.4.3/ClaudeNotch.zip" length="2034768" type="application/octet-stream" sparkle:edSignature="sbvuBHgG6y0YgRW9ZhAI9QJdLNbP1BUzDq2VBA2KX/ro2cp3kNadCIwfNI172shcKq4PPEB5x8CNgib0BC8GCQ=="/>
+        </item>
+        <item>
             <title>0.4.2</title>
             <description><![CDATA[
                 <h2>Ultra limits, and a prompt-cache countdown</h2>
